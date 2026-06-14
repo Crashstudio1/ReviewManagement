@@ -21,6 +21,42 @@ export interface FeedbackSummary {
   monthlyTrend: Array<{ month: string; reviews: number; avg: number }>;
 }
 
+export interface AnalyticsOverview {
+  totalReviews: number;
+  satisfactionRate: number;
+  negativeRate: number;
+  averageRating: number;
+  dailyAverage: number;
+  ratingDistribution: Array<{ name: string; rating: number; value: number }>;
+  monthlyTrend: Array<{ month: string; positive: number; negative: number; reviews: number; avg: number }>;
+  dailyVolume: Array<{ day: string; reviews: number }>;
+}
+
+export interface TokenReportRow {
+  id: number;
+  token: string;
+  serviceCode: string;
+  serviceName: string;
+  issuedYear: number;
+  issuedAt: string;
+}
+
+export interface AdminSettings {
+  organizationName?: string;
+  kioskTitle?: string;
+  supportPhone?: string;
+  reportEmail?: string;
+}
+
+export interface AdminUser {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  active: boolean;
+  createdAt: string;
+}
+
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "http://localhost:4000/api").replace(/\/$/, "");
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -82,6 +118,47 @@ export const api = {
 
   getFeedbackSummary() {
     return request<FeedbackSummary>("/feedback/summary");
+  },
+
+  getAnalyticsOverview() {
+    return request<AnalyticsOverview>("/analytics/overview");
+  },
+
+  getFeedbackReport() {
+    return request<FeedbackReview[]>("/reports/feedback");
+  },
+
+  getTokenReport() {
+    return request<TokenReportRow[]>("/reports/tokens");
+  },
+
+  getSettings() {
+    return request<AdminSettings>("/settings");
+  },
+
+  updateSettings(settings: AdminSettings) {
+    return request<AdminSettings>("/settings", {
+      method: "PUT",
+      body: JSON.stringify(settings),
+    });
+  },
+
+  getUsers() {
+    return request<AdminUser[]>("/users");
+  },
+
+  addUser(user: Pick<AdminUser, "name" | "email" | "role">) {
+    return request<AdminUser>("/users", {
+      method: "POST",
+      body: JSON.stringify(user),
+    });
+  },
+
+  updateUserStatus(id: number, active: boolean) {
+    return request<{ id: number; active: boolean }>(`/users/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ active }),
+    });
   },
 
   submitFeedback(payload: { rating: number; comment?: string; mobile?: string }) {

@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import {
   BarChart2, Users, Star, ThumbsUp, ThumbsDown,
   LayoutDashboard, FileText, Settings, LogOut,
-  TrendingUp, MessageSquare, ChevronRight, Menu, X, PlusCircle, Pencil, Save, RotateCcw
+  TrendingUp, MessageSquare, ChevronRight, Menu, X, PlusCircle, Pencil, Save, RotateCcw,
+  Download, RefreshCw, UserPlus
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -11,7 +12,14 @@ import {
 import { DevelopingPartner } from "./DevelopingPartner";
 import { GovernmentLogo } from "./GovernmentLogo";
 import { type Service } from "./ServiceSelection";
-import { api, type FeedbackReview, type FeedbackSummary } from "../api";
+import {
+  api,
+  type AdminSettings,
+  type AdminUser,
+  type FeedbackReview,
+  type FeedbackSummary,
+  type TokenReportRow,
+} from "../api";
 
 const EMPTY_FEEDBACK_SUMMARY: FeedbackSummary = {
   total: 0,
@@ -30,6 +38,26 @@ const RATING_COLORS: Record<number, string> = {
   4: "#388E3C",
   5: "#2E7D32",
 };
+
+function csvValue(value: unknown) {
+  return `"${String(value ?? "").replace(/"/g, '""')}"`;
+}
+
+function downloadCsv(filename: string, rows: Array<Record<string, unknown>>, columns: Array<{ key: string; label: string }>) {
+  const csv = [
+    columns.map((column) => csvValue(column.label)).join(","),
+    ...rows.map((row) => columns.map((column) => csvValue(row[column.key])).join(",")),
+  ].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
 
 type NavItem = { id: string; label: string; icon: React.ReactNode };
 
@@ -514,6 +542,311 @@ function YearlyTokenUsagePanel({
   );
 }
 
+function ReportsAdminPanel({
+  feedbackReport,
+  tokenReport,
+  error,
+  onRefresh,
+}: {
+  feedbackReport: FeedbackReview[];
+  tokenReport: TokenReportRow[];
+  error: string;
+  onRefresh: () => void;
+}) {
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 className="font-semibold" style={{ color: "var(--gov-maroon)", fontSize: "1.15rem" }}>
+            Reports
+          </h2>
+          <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+            Export live feedback and token data for Excel analysis.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onRefresh}
+          className="flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold"
+          style={{ background: "#fff", border: "1px solid var(--border)", color: "var(--gov-maroon)" }}
+        >
+          <RefreshCw size={16} />
+          Refresh
+        </button>
+      </div>
+
+      {error && (
+        <div className="rounded-xl px-4 py-3 text-sm" style={{ background: "#FFEBEE", border: "1px solid #FFCDD2", color: "#C62828" }}>
+          {error}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <div className="rounded-2xl p-5 shadow-sm" style={{ background: "#fff", border: "1px solid var(--border)" }}>
+          <div className="mb-5 flex items-center justify-between gap-3">
+            <div>
+              <h3 className="font-semibold" style={{ color: "var(--gov-maroon)" }}>Feedback Report</h3>
+              <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>{feedbackReport.length} feedback rows</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => downloadCsv("feedback-report.csv", feedbackReport as unknown as Array<Record<string, unknown>>, [
+                { key: "id", label: "ID" },
+                { key: "date", label: "Date & Time" },
+                { key: "rating", label: "Rating" },
+                { key: "comment", label: "Comment" },
+                { key: "mobile", label: "Contact Number" },
+                { key: "status", label: "Status" },
+              ])}
+              className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white"
+              style={{ background: "var(--gov-maroon)" }}
+            >
+              <Download size={16} />
+              Export Excel
+            </button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr style={{ background: "var(--gov-cream)" }}>
+                  {["Date", "Rating", "Contact", "Status"].map((header) => (
+                    <th key={header} className="px-4 py-3 text-left text-xs font-semibold uppercase" style={{ color: "var(--muted-foreground)" }}>
+                      {header}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {feedbackReport.slice(0, 8).map((row) => (
+                  <tr key={row.id} className="border-t" style={{ borderColor: "var(--border)" }}>
+                    <td className="px-4 py-3 text-xs" style={{ color: "var(--muted-foreground)" }}>{row.date}</td>
+                    <td className="px-4 py-3"><StarRating rating={row.rating} /></td>
+                    <td className="px-4 py-3 text-sm" style={{ color: "var(--foreground)" }}>{row.mobile}</td>
+                    <td className="px-4 py-3"><StatusBadge status={row.status} /></td>
+                  </tr>
+                ))}
+                {feedbackReport.length === 0 && (
+                  <tr className="border-t" style={{ borderColor: "var(--border)" }}>
+                    <td colSpan={4} className="px-4 py-8 text-center text-sm" style={{ color: "var(--muted-foreground)" }}>
+                      No feedback records yet.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="rounded-2xl p-5 shadow-sm" style={{ background: "#fff", border: "1px solid var(--border)" }}>
+          <div className="mb-5 flex items-center justify-between gap-3">
+            <div>
+              <h3 className="font-semibold" style={{ color: "var(--gov-maroon)" }}>Token Report</h3>
+              <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>{tokenReport.length} issued tokens</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => downloadCsv("token-report.csv", tokenReport as unknown as Array<Record<string, unknown>>, [
+                { key: "id", label: "ID" },
+                { key: "token", label: "Token" },
+                { key: "serviceCode", label: "Service Code" },
+                { key: "serviceName", label: "Service Name" },
+                { key: "issuedYear", label: "Issued Year" },
+                { key: "issuedAt", label: "Issued At" },
+              ])}
+              className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white"
+              style={{ background: "var(--gov-maroon)" }}
+            >
+              <Download size={16} />
+              Export Excel
+            </button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr style={{ background: "var(--gov-cream)" }}>
+                  {["Token", "Service", "Year", "Issued"].map((header) => (
+                    <th key={header} className="px-4 py-3 text-left text-xs font-semibold uppercase" style={{ color: "var(--muted-foreground)" }}>
+                      {header}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {tokenReport.slice(0, 8).map((row) => (
+                  <tr key={row.id} className="border-t" style={{ borderColor: "var(--border)" }}>
+                    <td className="px-4 py-3 text-sm font-bold" style={{ color: "var(--gov-maroon)" }}>{row.token}</td>
+                    <td className="px-4 py-3 text-sm" style={{ color: "var(--foreground)" }}>{row.serviceName}</td>
+                    <td className="px-4 py-3 text-sm" style={{ color: "var(--muted-foreground)" }}>{row.issuedYear}</td>
+                    <td className="px-4 py-3 text-xs" style={{ color: "var(--muted-foreground)" }}>{row.issuedAt}</td>
+                  </tr>
+                ))}
+                {tokenReport.length === 0 && (
+                  <tr className="border-t" style={{ borderColor: "var(--border)" }}>
+                    <td colSpan={4} className="px-4 py-8 text-center text-sm" style={{ color: "var(--muted-foreground)" }}>
+                      No token records yet.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SettingsAdminPanel({
+  settings,
+  message,
+  error,
+  onChange,
+  onSubmit,
+}: {
+  settings: AdminSettings;
+  message: string;
+  error: string;
+  onChange: (settings: AdminSettings) => void;
+  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <form onSubmit={onSubmit} className="space-y-6">
+      <div>
+        <h2 className="font-semibold" style={{ color: "var(--gov-maroon)", fontSize: "1.15rem" }}>Settings</h2>
+        <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Manage kiosk and reporting settings.</p>
+      </div>
+      <div className="rounded-2xl p-5 shadow-sm" style={{ background: "#fff", border: "1px solid var(--border)" }}>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {[
+            ["organizationName", "Organization Name"],
+            ["kioskTitle", "Kiosk Title"],
+            ["supportPhone", "Support Phone"],
+            ["reportEmail", "Report Email"],
+          ].map(([key, label]) => (
+            <div key={key}>
+              <label className="mb-2 block text-sm font-semibold" htmlFor={`setting-${key}`}>{label}</label>
+              <input
+                id={`setting-${key}`}
+                value={String(settings[key as keyof AdminSettings] || "")}
+                onChange={(event) => onChange({ ...settings, [key]: event.target.value })}
+                className="w-full rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2"
+                style={{ border: "1.5px solid var(--border)", "--tw-ring-color": "var(--gov-maroon)" } as React.CSSProperties}
+              />
+            </div>
+          ))}
+        </div>
+        {message && <div className="mt-4 rounded-xl px-4 py-3 text-sm" style={{ background: "#E8F5E9", color: "#1B5E20" }}>{message}</div>}
+        {error && <div className="mt-4 rounded-xl px-4 py-3 text-sm" style={{ background: "#FFEBEE", color: "#C62828" }}>{error}</div>}
+        <button
+          type="submit"
+          className="mt-5 flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white"
+          style={{ background: "var(--gov-maroon)" }}
+        >
+          <Save size={16} />
+          Save Settings
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function UsersAdminPanel({
+  users,
+  form,
+  error,
+  onFormChange,
+  onSubmit,
+  onToggleUser,
+}: {
+  users: AdminUser[];
+  form: { name: string; email: string; role: string };
+  error: string;
+  onFormChange: (form: { name: string; email: string; role: string }) => void;
+  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+  onToggleUser: (user: AdminUser) => void;
+}) {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="font-semibold" style={{ color: "var(--gov-maroon)", fontSize: "1.15rem" }}>Users</h2>
+        <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Manage admin users who can operate the dashboard.</p>
+      </div>
+      <form onSubmit={onSubmit} className="grid grid-cols-1 gap-4 rounded-2xl p-5 shadow-sm lg:grid-cols-[1fr_1fr_0.7fr_auto]" style={{ background: "#fff", border: "1px solid var(--border)" }}>
+        <input
+          value={form.name}
+          onChange={(event) => onFormChange({ ...form, name: event.target.value })}
+          placeholder="Full name"
+          className="rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2"
+          style={{ border: "1.5px solid var(--border)", "--tw-ring-color": "var(--gov-maroon)" } as React.CSSProperties}
+        />
+        <input
+          type="email"
+          value={form.email}
+          onChange={(event) => onFormChange({ ...form, email: event.target.value })}
+          placeholder="Email address"
+          className="rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2"
+          style={{ border: "1.5px solid var(--border)", "--tw-ring-color": "var(--gov-maroon)" } as React.CSSProperties}
+        />
+        <select
+          value={form.role}
+          onChange={(event) => onFormChange({ ...form, role: event.target.value })}
+          className="rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2"
+          style={{ border: "1.5px solid var(--border)", "--tw-ring-color": "var(--gov-maroon)" } as React.CSSProperties}
+        >
+          <option>Administrator</option>
+          <option>Supervisor</option>
+          <option>Staff</option>
+        </select>
+        <button type="submit" className="flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white" style={{ background: "var(--gov-maroon)" }}>
+          <UserPlus size={16} />
+          Add
+        </button>
+        {error && <div className="lg:col-span-4 rounded-xl px-4 py-3 text-sm" style={{ background: "#FFEBEE", color: "#C62828" }}>{error}</div>}
+      </form>
+
+      <div className="overflow-hidden rounded-2xl shadow-sm" style={{ background: "#fff", border: "1px solid var(--border)" }}>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr style={{ background: "var(--gov-cream)" }}>
+                {["Name", "Email", "Role", "Status", "Action"].map((header) => (
+                  <th key={header} className="px-5 py-3 text-left text-xs font-semibold uppercase" style={{ color: "var(--muted-foreground)" }}>
+                    {header}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((user) => (
+                <tr key={user.id} className="border-t" style={{ borderColor: "var(--border)" }}>
+                  <td className="px-5 py-3.5 text-sm font-semibold" style={{ color: "var(--foreground)" }}>{user.name}</td>
+                  <td className="px-5 py-3.5 text-sm" style={{ color: "var(--muted-foreground)" }}>{user.email}</td>
+                  <td className="px-5 py-3.5 text-sm" style={{ color: "var(--foreground)" }}>{user.role}</td>
+                  <td className="px-5 py-3.5">
+                    <span className="rounded-full px-2.5 py-1 text-xs font-semibold" style={{ background: user.active ? "#E8F5E9" : "#F5F5F5", color: user.active ? "#1B5E20" : "#777" }}>
+                      {user.active ? "Active" : "Inactive"}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3.5">
+                    <button type="button" onClick={() => onToggleUser(user)} className="rounded-lg px-3 py-2 text-xs font-semibold" style={{ background: "var(--gov-cream)", color: "var(--gov-maroon)" }}>
+                      {user.active ? "Deactivate" : "Activate"}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {users.length === 0 && (
+                <tr className="border-t" style={{ borderColor: "var(--border)" }}>
+                  <td colSpan={5} className="px-5 py-8 text-center text-sm" style={{ color: "var(--muted-foreground)" }}>No admin users yet.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface AdminDashboardProps {
   onNavigate: (page: string) => void;
   services: Service[];
@@ -540,36 +873,108 @@ export function AdminDashboard({ onNavigate, services, onAddService, onUpdateSer
   const [recentReviews, setRecentReviews] = useState<FeedbackReview[]>([]);
   const [feedbackSummary, setFeedbackSummary] = useState<FeedbackSummary>(EMPTY_FEEDBACK_SUMMARY);
   const [feedbackError, setFeedbackError] = useState("");
+  const [feedbackReport, setFeedbackReport] = useState<FeedbackReview[]>([]);
+  const [tokenReport, setTokenReport] = useState<TokenReportRow[]>([]);
+  const [reportError, setReportError] = useState("");
+  const [settings, setSettings] = useState<AdminSettings>({});
+  const [settingsMessage, setSettingsMessage] = useState("");
+  const [settingsError, setSettingsError] = useState("");
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [userForm, setUserForm] = useState({ name: "", email: "", role: "Staff" });
+  const [userError, setUserError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
 
-    async function loadFeedback() {
+    async function loadAdminData() {
       try {
-        const [reviews, summary] = await Promise.all([
+        const [reviews, summary, reportRows, tokenRows, loadedSettings, loadedUsers] = await Promise.all([
           api.getRecentFeedback(8),
           api.getFeedbackSummary(),
+          api.getFeedbackReport(),
+          api.getTokenReport(),
+          api.getSettings(),
+          api.getUsers(),
         ]);
         if (!cancelled) {
           setRecentReviews(reviews);
           setFeedbackSummary(summary);
+          setFeedbackReport(reportRows);
+          setTokenReport(tokenRows);
+          setSettings(loadedSettings);
+          setUsers(loadedUsers);
           setFeedbackError("");
+          setReportError("");
+          setSettingsError("");
+          setUserError("");
         }
       } catch {
         if (!cancelled) {
           setRecentReviews([]);
           setFeedbackSummary(EMPTY_FEEDBACK_SUMMARY);
           setFeedbackError("Feedback data is unavailable.");
+          setReportError("Report data is unavailable.");
         }
       }
     }
 
-    loadFeedback();
+    loadAdminData();
 
     return () => {
       cancelled = true;
     };
   }, []);
+
+  async function refreshReports() {
+    try {
+      const [reportRows, tokenRows] = await Promise.all([
+        api.getFeedbackReport(),
+        api.getTokenReport(),
+      ]);
+      setFeedbackReport(reportRows);
+      setTokenReport(tokenRows);
+      setReportError("");
+    } catch {
+      setReportError("Report data is unavailable.");
+    }
+  }
+
+  async function saveSettings(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    try {
+      const saved = await api.updateSettings(settings);
+      setSettings((prev) => ({ ...prev, ...saved }));
+      setSettingsMessage("Settings were saved.");
+      setSettingsError("");
+    } catch {
+      setSettingsMessage("");
+      setSettingsError("Settings could not be saved.");
+    }
+  }
+
+  async function addUser(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setUserError("");
+
+    try {
+      const saved = await api.addUser(userForm);
+      setUsers((prev) => [saved, ...prev]);
+      setUserForm({ name: "", email: "", role: "Staff" });
+    } catch (error) {
+      setUserError(error instanceof Error ? error.message : "User could not be added.");
+    }
+  }
+
+  async function toggleUser(user: AdminUser) {
+    try {
+      const updated = await api.updateUserStatus(user.id, !user.active);
+      setUsers((prev) => prev.map((item) => (
+        item.id === user.id ? { ...item, active: updated.active } : item
+      )));
+    } catch {
+      setUserError("User status could not be updated.");
+    }
+  }
 
   function navigate(id: string) {
     if (id === "analytics") { onNavigate("analytics"); return; }
@@ -832,6 +1237,34 @@ export function AdminDashboard({ onNavigate, services, onAddService, onUpdateSer
               onSubmit={handleAddService}
               onEditService={handleEditService}
               onCancelEdit={handleCancelEdit}
+            />
+          ) : active === "reports" ? (
+            <ReportsAdminPanel
+              feedbackReport={feedbackReport}
+              tokenReport={tokenReport}
+              error={reportError}
+              onRefresh={refreshReports}
+            />
+          ) : active === "settings" ? (
+            <SettingsAdminPanel
+              settings={settings}
+              message={settingsMessage}
+              error={settingsError}
+              onChange={(nextSettings) => {
+                setSettings(nextSettings);
+                setSettingsMessage("");
+                setSettingsError("");
+              }}
+              onSubmit={saveSettings}
+            />
+          ) : active === "users" ? (
+            <UsersAdminPanel
+              users={users}
+              form={userForm}
+              error={userError}
+              onFormChange={setUserForm}
+              onSubmit={addUser}
+              onToggleUser={toggleUser}
             />
           ) : (
             <>

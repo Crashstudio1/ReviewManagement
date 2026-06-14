@@ -334,16 +334,16 @@ test("POST /api/feedback stores valid reviews", async () => {
   assert.deepEqual(calls[0].params, [4, "Good", null]);
 });
 
-test("GET /api/feedback/recent returns masked live reviews", async () => {
+test("GET /api/feedback/recent returns live reviews with contact numbers", async () => {
   const app = createApp({
     async query(sql, params) {
       assert.match(sql, /FROM feedback/);
       assert.deepEqual(params, [8]);
       return [[{
         id: 7,
-        rating: 5,
-        comment: "Fast service",
-        mobile: "0771234523",
+      rating: 5,
+      comment: "Fast service",
+      mobile: "0771234523",
         created_at: new Date("2026-06-14T09:15:00.000Z"),
       }]];
     },
@@ -358,7 +358,7 @@ test("GET /api/feedback/recent returns masked live reviews", async () => {
       date: "2026-06-14 09:15",
       rating: 5,
       comment: "Fast service",
-      mobile: "077*****23",
+      mobile: "0771234523",
       status: "Positive",
     }]);
   });
@@ -419,4 +419,130 @@ test("GET /api/feedback/summary returns real dashboard aggregates", async () => 
       }],
     });
   });
+});
+
+test("GET /api/analytics/overview returns live analytics aggregates", async () => {
+  let call = 0;
+  const app = createApp({
+    async query(sql) {
+      call += 1;
+      if (call === 1) {
+        assert.match(sql, /COUNT\(\*\) AS total/);
+        return [[{ total: 4, averageRating: 4.25, positive: 3, negative: 1 }]];
+      }
+      if (call === 2) {
+        assert.match(sql, /GROUP BY rating/);
+        return [[{ rating: 1, count: 1 }, { rating: 5, count: 3 }]];
+      }
+      if (call === 3) {
+        assert.match(sql, /positive/);
+        return [[{ month: "Jun", positive: 3, negative: 1, reviews: 4, avg: 4.25 }]];
+      }
+      assert.match(sql, /GROUP BY dayKey/);
+      return [[{ day: "Mon", reviews: 4 }]];
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/analytics/overview`);
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+      totalReviews: 4,
+      satisfactionRate: 75,
+      negativeRate: 25,
+      averageRating: 4.3,
+      dailyAverage: 4,
+      ratingDistribution: [
+        { name: "1 Star", rating: 1, value: 1 },
+        { name: "2 Stars", rating: 2, value: 0 },
+        { name: "3 Stars", rating: 3, value: 0 },
+        { name: "4 Stars", rating: 4, value: 0 },
+        { name: "5 Stars", rating: 5, value: 3 },
+      ],
+      monthlyTrend: [{ month: "Jun", positive: 3, negative: 1, reviews: 4, avg: 4.3 }],
+      dailyVolume: [{ day: "Mon", reviews: 4 }],
+    });
+  });
+});
+
+test("GET /api/reports/tokens returns issued token rows", async () => {
+  const app = createApp({
+    async query(sql) {
+      assert.match(sql, /FROM token_issues/);
+      return [[{
+        id: 9,
+        token_number: "A001",
+        service_code: "A",
+        service_name: "Building Approval",
+        issued_year: 2026,
+        issued_at: new Date("2026-06-14T10:30:00.000Z"),
+      }]];
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/reports/tokens`);
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), [{
+      id: 9,
+      token: "A001",
+      serviceCode: "A",
+      serviceName: "Building Approval",
+      issuedYear: 2026,
+      issuedAt: "2026-06-14 10:30",
+    }]);
+  });
+});
+
+test("GET /api/settings returns admin settings object", async () => {
+  const app = createApp({
+    async query(sql) {
+      assert.match(sql, /FROM admin_settings/);
+      return [[
+        { setting_key: "organizationName", setting_value: "Council" },
+        { setting_key: "supportPhone", setting_value: "011" },
+      ]];
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/settings`);
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+      organizationName: "Council",
+      supportPhone: "011",
+    });
+  });
+});
+
+test("POST /api/users creates admin users", async () => {
+  const calls = [];
+  const app = createApp({
+    async query(sql, params) {
+      calls.push({ sql, params });
+      return [{ insertId: 12 }];
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/users`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Jane Admin", email: "JANE@EXAMPLE.COM", role: "Supervisor" }),
+    });
+
+    assert.equal(response.status, 201);
+    const body = await response.json();
+    assert.equal(body.id, 12);
+    assert.equal(body.name, "Jane Admin");
+    assert.equal(body.email, "jane@example.com");
+    assert.equal(body.role, "Supervisor");
+    assert.equal(body.active, true);
+  });
+
+  assert.match(calls[0].sql, /INSERT INTO admin_users/);
+  assert.deepEqual(calls[0].params, ["Jane Admin", "jane@example.com", "Supervisor"]);
 });

@@ -23,4 +23,8 @@ test("Admin dashboard sidebar has a close control and mobile closed state", asyn
   assert.doesNotMatch(source, /REVIEWS\.map/);
   assert.doesNotMatch(source, /RATING_DIST\.map/);
   assert.doesNotMatch(source, /LineChart data={MONTHLY}/);
+  assert.match(source, /ReportsAdminPanel/);
+  assert.match(source, /Export Excel/);
+  assert.match(source, /SettingsAdminPanel/);
+  assert.match(source, /UsersAdminPanel/);
 });

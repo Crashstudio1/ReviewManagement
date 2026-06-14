@@ -47,6 +47,32 @@ const ddl = [
     INDEX idx_feedback_created_at (created_at),
     INDEX idx_feedback_rating (rating)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS admin_settings (
+    setting_key VARCHAR(64) PRIMARY KEY,
+    setting_value TEXT NOT NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS admin_users (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(120) NOT NULL,
+    email VARCHAR(190) NOT NULL UNIQUE,
+    role VARCHAR(64) NOT NULL DEFAULT 'Staff',
+    active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_admin_users_active (active)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+];
+
+const defaultSettings = {
+  organizationName: "Vavuniya South Tamil Pradeshiya Sabha",
+  kioskTitle: "Government Citizen Review System",
+  supportPhone: "",
+  reportEmail: "",
+};
+
+const defaultAdminUsers = [
+  { name: "Admin", email: "admin@example.com", role: "Administrator" },
 ];
 
 try {
@@ -64,6 +90,22 @@ try {
          name_en = VALUES(name_en),
          active = 1`,
       [service.code, service.emoji, service.ta, service.si, service.en],
+    );
+  }
+  for (const [key, value] of Object.entries(defaultSettings)) {
+    await bootstrapPool.query(
+      `INSERT INTO admin_settings (setting_key, setting_value)
+       VALUES (?, ?)
+       ON DUPLICATE KEY UPDATE setting_value = setting_value`,
+      [key, value],
+    );
+  }
+  for (const user of defaultAdminUsers) {
+    await bootstrapPool.query(
+      `INSERT INTO admin_users (name, email, role)
+       VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE name = VALUES(name), role = VALUES(role), active = 1`,
+      [user.name, user.email, user.role],
     );
   }
   console.log(`MySQL database ready: ${dbName}`);

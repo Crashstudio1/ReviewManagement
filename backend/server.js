@@ -40,10 +40,9 @@ function getFeedbackStatus(rating) {
   return "Neutral";
 }
 
-function maskMobile(mobile) {
+function displayMobile(mobile) {
   if (!mobile) return "-";
-  if (mobile.length <= 4) return mobile;
-  return `${mobile.slice(0, 3)}*****${mobile.slice(-2)}`;
+  return mobile;
 }
 
 function toFeedbackReview(row) {
@@ -60,9 +59,34 @@ function toFeedbackReview(row) {
     date,
     rating,
     comment: row.comment || "",
-    mobile: maskMobile(String(row.mobile || "").trim()),
+    mobile: displayMobile(String(row.mobile || "").trim()),
     status: getFeedbackStatus(rating),
   };
+}
+
+function toAdminUser(row) {
+  return {
+    id: Number(row.id),
+    name: row.name,
+    email: row.email,
+    role: row.role,
+    active: Boolean(row.active),
+    createdAt: row.created_at instanceof Date
+      ? row.created_at.toISOString().slice(0, 10)
+      : String(row.created_at || ""),
+  };
+}
+
+function csvValue(value) {
+  const text = value === null || value === undefined ? "" : String(value);
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function toCsv(rows, columns) {
+  return [
+    columns.map((column) => csvValue(column.label)).join(","),
+    ...rows.map((row) => columns.map((column) => csvValue(row[column.key])).join(",")),
+  ].join("\n");
 }
 
 export function createApp(apiPool = pool) {
@@ -335,6 +359,285 @@ app.get("/api/feedback/summary", async (_req, res, next) => {
         avg: Number(Number(row.avg || 0).toFixed(1)),
       })),
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/analytics/overview", async (_req, res, next) => {
+  try {
+    const [[totals]] = await apiPool.query(
+      `SELECT
+         COUNT(*) AS total,
+         COALESCE(AVG(rating), 0) AS averageRating,
+         COALESCE(SUM(CASE WHEN rating >= 4 THEN 1 ELSE 0 END), 0) AS positive,
+         COALESCE(SUM(CASE WHEN rating <= 2 THEN 1 ELSE 0 END), 0) AS negative
+       FROM feedback`,
+    );
+    const [ratingRows] = await apiPool.query(
+      `SELECT rating, COUNT(*) AS count
+       FROM feedback
+       GROUP BY rating
+       ORDER BY rating`,
+    );
+    const [monthlyRows] = await apiPool.query(
+      `SELECT
+         DATE_FORMAT(created_at, '%b') AS month,
+         DATE_FORMAT(created_at, '%Y-%m') AS monthKey,
+         COALESCE(SUM(CASE WHEN rating >= 4 THEN 1 ELSE 0 END), 0) AS positive,
+         COALESCE(SUM(CASE WHEN rating <= 2 THEN 1 ELSE 0 END), 0) AS negative,
+         COUNT(*) AS reviews,
+         COALESCE(AVG(rating), 0) AS avg
+       FROM feedback
+       WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 5 MONTH)
+       GROUP BY monthKey, month
+       ORDER BY monthKey`,
+    );
+    const [dailyRows] = await apiPool.query(
+      `SELECT
+         DATE_FORMAT(created_at, '%a') AS day,
+         DATE(created_at) AS dayKey,
+         COUNT(*) AS reviews
+       FROM feedback
+       WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+       GROUP BY dayKey, day
+       ORDER BY dayKey`,
+    );
+
+    const total = Number(totals.total || 0);
+    const positive = Number(totals.positive || 0);
+    const negative = Number(totals.negative || 0);
+
+    res.json({
+      totalReviews: total,
+      satisfactionRate: total ? Math.round((positive / total) * 100) : 0,
+      negativeRate: total ? Number(((negative / total) * 100).toFixed(1)) : 0,
+      averageRating: Number(Number(totals.averageRating || 0).toFixed(1)),
+      dailyAverage: dailyRows.length
+        ? Number((dailyRows.reduce((sum, row) => sum + Number(row.reviews || 0), 0) / dailyRows.length).toFixed(1))
+        : 0,
+      ratingDistribution: [1, 2, 3, 4, 5].map((rating) => {
+        const row = ratingRows.find((item) => Number(item.rating) === rating);
+        return {
+          name: `${rating} ${rating === 1 ? "Star" : "Stars"}`,
+          rating,
+          value: Number(row?.count || 0),
+        };
+      }),
+      monthlyTrend: monthlyRows.map((row) => ({
+        month: row.month,
+        positive: Number(row.positive || 0),
+        negative: Number(row.negative || 0),
+        reviews: Number(row.reviews || 0),
+        avg: Number(Number(row.avg || 0).toFixed(1)),
+      })),
+      dailyVolume: dailyRows.map((row) => ({
+        day: row.day,
+        reviews: Number(row.reviews || 0),
+      })),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/reports/feedback", async (_req, res, next) => {
+  try {
+    const [rows] = await apiPool.query(
+      `SELECT id, rating, comment, mobile, created_at
+       FROM feedback
+       ORDER BY created_at DESC`,
+    );
+    res.json(rows.map(toFeedbackReview));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/reports/tokens", async (_req, res, next) => {
+  try {
+    const [rows] = await apiPool.query(
+      `SELECT id, token_number, service_code, service_name, issued_year, issued_at
+       FROM token_issues
+       ORDER BY issued_at DESC`,
+    );
+    res.json(rows.map((row) => ({
+      id: Number(row.id),
+      token: row.token_number,
+      serviceCode: row.service_code,
+      serviceName: row.service_name,
+      issuedYear: Number(row.issued_year),
+      issuedAt: row.issued_at instanceof Date
+        ? row.issued_at.toISOString().slice(0, 16).replace("T", " ")
+        : String(row.issued_at || ""),
+    })));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/reports/:type/export", async (req, res, next) => {
+  try {
+    if (req.params.type === "feedback") {
+      const [rows] = await apiPool.query(
+        `SELECT id, rating, comment, mobile, created_at
+         FROM feedback
+         ORDER BY created_at DESC`,
+      );
+      const csv = toCsv(rows.map(toFeedbackReview), [
+        { key: "id", label: "ID" },
+        { key: "date", label: "Date & Time" },
+        { key: "rating", label: "Rating" },
+        { key: "comment", label: "Comment" },
+        { key: "mobile", label: "Contact Number" },
+        { key: "status", label: "Status" },
+      ]);
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", "attachment; filename=feedback-report.csv");
+      res.send(csv);
+      return;
+    }
+
+    if (req.params.type === "tokens") {
+      const [rows] = await apiPool.query(
+        `SELECT id, token_number, service_code, service_name, issued_year, issued_at
+         FROM token_issues
+         ORDER BY issued_at DESC`,
+      );
+      const csv = toCsv(rows.map((row) => ({
+        id: Number(row.id),
+        token: row.token_number,
+        serviceCode: row.service_code,
+        serviceName: row.service_name,
+        issuedYear: Number(row.issued_year),
+        issuedAt: row.issued_at instanceof Date
+          ? row.issued_at.toISOString().slice(0, 16).replace("T", " ")
+          : String(row.issued_at || ""),
+      })), [
+        { key: "id", label: "ID" },
+        { key: "token", label: "Token" },
+        { key: "serviceCode", label: "Service Code" },
+        { key: "serviceName", label: "Service Name" },
+        { key: "issuedYear", label: "Issued Year" },
+        { key: "issuedAt", label: "Issued At" },
+      ]);
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", "attachment; filename=token-report.csv");
+      res.send(csv);
+      return;
+    }
+
+    res.status(404).json({ error: "Report type was not found." });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/settings", async (_req, res, next) => {
+  try {
+    const [rows] = await apiPool.query(
+      `SELECT setting_key, setting_value
+       FROM admin_settings
+       ORDER BY setting_key`,
+    );
+    const settings = {};
+    for (const row of rows) {
+      settings[row.setting_key] = row.setting_value;
+    }
+    res.json(settings);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put("/api/settings", async (req, res, next) => {
+  try {
+    const allowed = ["organizationName", "kioskTitle", "supportPhone", "reportEmail"];
+    const settings = {};
+
+    for (const key of allowed) {
+      if (Object.hasOwn(req.body || {}, key)) {
+        const value = String(req.body[key] || "").trim();
+        settings[key] = value;
+        await apiPool.query(
+          `INSERT INTO admin_settings (setting_key, setting_value)
+           VALUES (?, ?)
+           ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)`,
+          [key, value],
+        );
+      }
+    }
+
+    res.json(settings);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/users", async (_req, res, next) => {
+  try {
+    const [rows] = await apiPool.query(
+      `SELECT id, name, email, role, active, created_at
+       FROM admin_users
+       ORDER BY active DESC, name`,
+    );
+    res.json(rows.map(toAdminUser));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/users", async (req, res, next) => {
+  try {
+    const name = String(req.body.name || "").trim();
+    const email = String(req.body.email || "").trim().toLowerCase();
+    const role = String(req.body.role || "Staff").trim() || "Staff";
+
+    if (!name || !email) {
+      res.status(400).json({ error: "Name and email are required." });
+      return;
+    }
+
+    const [result] = await apiPool.query(
+      `INSERT INTO admin_users (name, email, role)
+       VALUES (?, ?, ?)`,
+      [name, email, role],
+    );
+
+    res.status(201).json({
+      id: result.insertId,
+      name,
+      email,
+      role,
+      active: true,
+      createdAt: new Date().toISOString().slice(0, 10),
+    });
+  } catch (error) {
+    if (error?.code === "ER_DUP_ENTRY") {
+      error.status = 409;
+      error.message = "User email is already used.";
+    }
+    next(error);
+  }
+});
+
+app.patch("/api/users/:id", async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    const active = Boolean(req.body.active);
+    const [result] = await apiPool.query(
+      `UPDATE admin_users
+       SET active = ?
+       WHERE id = ?`,
+      [active ? 1 : 0, id],
+    );
+
+    if (result.affectedRows === 0) {
+      res.status(404).json({ error: "User was not found." });
+      return;
+    }
+
+    res.json({ id, active });
   } catch (error) {
     next(error);
   }
