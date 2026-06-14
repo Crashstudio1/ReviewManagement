@@ -2,6 +2,25 @@ import { type Service } from "./components/ServiceSelection";
 
 export type TokenUsageByYear = Record<string, Record<string, number>>;
 
+export interface FeedbackReview {
+  id: number;
+  date: string;
+  rating: number;
+  comment: string;
+  mobile: string;
+  status: "Positive" | "Negative" | "Neutral";
+}
+
+export interface FeedbackSummary {
+  total: number;
+  averageRating: number;
+  positive: number;
+  negative: number;
+  neutral: number;
+  ratingDistribution: Array<{ rating: number; count: number }>;
+  monthlyTrend: Array<{ month: string; reviews: number; avg: number }>;
+}
+
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "http://localhost:4000/api").replace(/\/$/, "");
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -55,6 +74,14 @@ export const api = {
 
   getTokenUsageByYear() {
     return request<TokenUsageByYear>("/tokens/usage/by-year");
+  },
+
+  getRecentFeedback(limit = 8) {
+    return request<FeedbackReview[]>(`/feedback/recent?limit=${encodeURIComponent(limit)}`);
+  },
+
+  getFeedbackSummary() {
+    return request<FeedbackSummary>("/feedback/summary");
   },
 
   submitFeedback(payload: { rating: number; comment?: string; mobile?: string }) {

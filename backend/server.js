@@ -34,6 +34,37 @@ function requireServiceFields(service) {
   }
 }
 
+function getFeedbackStatus(rating) {
+  if (rating >= 4) return "Positive";
+  if (rating <= 2) return "Negative";
+  return "Neutral";
+}
+
+function maskMobile(mobile) {
+  if (!mobile) return "-";
+  if (mobile.length <= 4) return mobile;
+  return `${mobile.slice(0, 3)}*****${mobile.slice(-2)}`;
+}
+
+function toFeedbackReview(row) {
+  const createdAt = row.created_at instanceof Date
+    ? row.created_at
+    : new Date(row.created_at);
+  const date = Number.isNaN(createdAt.getTime())
+    ? String(row.created_at || "")
+    : createdAt.toISOString().slice(0, 16).replace("T", " ");
+  const rating = Number(row.rating);
+
+  return {
+    id: Number(row.id),
+    date,
+    rating,
+    comment: row.comment || "",
+    mobile: maskMobile(String(row.mobile || "").trim()),
+    status: getFeedbackStatus(rating),
+  };
+}
+
 export function createApp(apiPool = pool) {
   const app = express();
 
@@ -228,6 +259,82 @@ app.post("/api/feedback", async (req, res, next) => {
     );
 
     res.status(201).json({ id: result.insertId, rating, comment, mobile });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/feedback/recent", async (req, res, next) => {
+  try {
+    const requestedLimit = Number(req.query.limit || 8);
+    const limit = Number.isInteger(requestedLimit)
+      ? Math.min(Math.max(requestedLimit, 1), 50)
+      : 8;
+    const [rows] = await apiPool.query(
+      `SELECT id, rating, comment, mobile, created_at
+       FROM feedback
+       ORDER BY created_at DESC
+       LIMIT ?`,
+      [limit],
+    );
+
+    res.json(rows.map(toFeedbackReview));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/feedback/summary", async (_req, res, next) => {
+  try {
+    const [[totals]] = await apiPool.query(
+      `SELECT
+         COUNT(*) AS total,
+         COALESCE(AVG(rating), 0) AS averageRating,
+         COALESCE(SUM(CASE WHEN rating >= 4 THEN 1 ELSE 0 END), 0) AS positive,
+         COALESCE(SUM(CASE WHEN rating <= 2 THEN 1 ELSE 0 END), 0) AS negative,
+         COALESCE(SUM(CASE WHEN rating = 3 THEN 1 ELSE 0 END), 0) AS neutral
+       FROM feedback`,
+    );
+
+    const [ratingRows] = await apiPool.query(
+      `SELECT rating, COUNT(*) AS count
+       FROM feedback
+       GROUP BY rating
+       ORDER BY rating`,
+    );
+
+    const [monthlyRows] = await apiPool.query(
+      `SELECT
+         DATE_FORMAT(created_at, '%b') AS month,
+         DATE_FORMAT(created_at, '%Y-%m') AS monthKey,
+         COUNT(*) AS reviews,
+         COALESCE(AVG(rating), 0) AS avg
+       FROM feedback
+       WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 5 MONTH)
+       GROUP BY monthKey, month
+       ORDER BY monthKey`,
+    );
+
+    const countsByRating = new Map(
+      ratingRows.map((row) => [Number(row.rating), Number(row.count)]),
+    );
+
+    res.json({
+      total: Number(totals.total || 0),
+      averageRating: Number(totals.averageRating || 0),
+      positive: Number(totals.positive || 0),
+      negative: Number(totals.negative || 0),
+      neutral: Number(totals.neutral || 0),
+      ratingDistribution: [1, 2, 3, 4, 5].map((rating) => ({
+        rating,
+        count: countsByRating.get(rating) || 0,
+      })),
+      monthlyTrend: monthlyRows.map((row) => ({
+        month: row.month,
+        reviews: Number(row.reviews || 0),
+        avg: Number(Number(row.avg || 0).toFixed(1)),
+      })),
+    });
   } catch (error) {
     next(error);
   }

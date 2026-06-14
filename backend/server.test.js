@@ -333,3 +333,90 @@ test("POST /api/feedback stores valid reviews", async () => {
   assert.match(calls[0].sql, /INSERT INTO feedback/);
   assert.deepEqual(calls[0].params, [4, "Good", null]);
 });
+
+test("GET /api/feedback/recent returns masked live reviews", async () => {
+  const app = createApp({
+    async query(sql, params) {
+      assert.match(sql, /FROM feedback/);
+      assert.deepEqual(params, [8]);
+      return [[{
+        id: 7,
+        rating: 5,
+        comment: "Fast service",
+        mobile: "0771234523",
+        created_at: new Date("2026-06-14T09:15:00.000Z"),
+      }]];
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/feedback/recent`);
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), [{
+      id: 7,
+      date: "2026-06-14 09:15",
+      rating: 5,
+      comment: "Fast service",
+      mobile: "077*****23",
+      status: "Positive",
+    }]);
+  });
+});
+
+test("GET /api/feedback/summary returns real dashboard aggregates", async () => {
+  let call = 0;
+  const app = createApp({
+    async query(sql) {
+      call += 1;
+      if (call === 1) {
+        assert.match(sql, /COUNT\(\*\) AS total/);
+        return [[{
+          total: 3,
+          averageRating: 3.666,
+          positive: 2,
+          negative: 1,
+          neutral: 0,
+        }]];
+      }
+      if (call === 2) {
+        assert.match(sql, /GROUP BY rating/);
+        return [[
+          { rating: 1, count: 1 },
+          { rating: 5, count: 2 },
+        ]];
+      }
+      assert.match(sql, /GROUP BY monthKey/);
+      return [[{
+        month: "Jun",
+        reviews: 3,
+        avg: 3.666,
+      }]];
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/feedback/summary`);
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+      total: 3,
+      averageRating: 3.666,
+      positive: 2,
+      negative: 1,
+      neutral: 0,
+      ratingDistribution: [
+        { rating: 1, count: 1 },
+        { rating: 2, count: 0 },
+        { rating: 3, count: 0 },
+        { rating: 4, count: 0 },
+        { rating: 5, count: 2 },
+      ],
+      monthlyTrend: [{
+        month: "Jun",
+        reviews: 3,
+        avg: 3.7,
+      }],
+    });
+  });
+});

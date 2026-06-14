@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   BarChart2, Users, Star, ThumbsUp, ThumbsDown,
   LayoutDashboard, FileText, Settings, LogOut,
@@ -11,34 +11,25 @@ import {
 import { DevelopingPartner } from "./DevelopingPartner";
 import { GovernmentLogo } from "./GovernmentLogo";
 import { type Service } from "./ServiceSelection";
+import { api, type FeedbackReview, type FeedbackSummary } from "../api";
 
-const REVIEWS = [
-  { id: 1, date: "2024-06-12 09:14", rating: 5, comment: "Excellent service, very fast processing!", mobile: "077*****23", status: "Positive" },
-  { id: 2, date: "2024-06-12 09:42", rating: 2, comment: "Long waiting time, staff not responsive.", mobile: "076*****88", status: "Negative" },
-  { id: 3, date: "2024-06-12 10:05", rating: 4, comment: "Good service overall.", mobile: "—", status: "Positive" },
-  { id: 4, date: "2024-06-12 10:38", rating: 3, comment: "Average experience. Could be better.", mobile: "071*****45", status: "Neutral" },
-  { id: 5, date: "2024-06-12 11:02", rating: 5, comment: "Very professional and courteous staff!", mobile: "—", status: "Positive" },
-  { id: 6, date: "2024-06-12 11:29", rating: 1, comment: "Waiting too long, poor facilities.", mobile: "075*****67", status: "Negative" },
-  { id: 7, date: "2024-06-12 12:10", rating: 4, comment: "Quick and efficient.", mobile: "—", status: "Positive" },
-  { id: 8, date: "2024-06-12 13:05", rating: 5, comment: "Excellent! Thank you.", mobile: "077*****12", status: "Positive" },
-];
+const EMPTY_FEEDBACK_SUMMARY: FeedbackSummary = {
+  total: 0,
+  averageRating: 0,
+  positive: 0,
+  negative: 0,
+  neutral: 0,
+  ratingDistribution: [1, 2, 3, 4, 5].map((rating) => ({ rating, count: 0 })),
+  monthlyTrend: [],
+};
 
-const RATING_DIST = [
-  { name: "1 ★", count: 3, fill: "#C62828" },
-  { name: "2 ★", count: 5, fill: "#B03A48" },
-  { name: "3 ★", count: 8, fill: "#D4AF37" },
-  { name: "4 ★", count: 18, fill: "#388E3C" },
-  { name: "5 ★", count: 24, fill: "#2E7D32" },
-];
-
-const MONTHLY = [
-  { month: "Jan", reviews: 62, avg: 3.8 },
-  { month: "Feb", reviews: 78, avg: 4.0 },
-  { month: "Mar", reviews: 91, avg: 3.9 },
-  { month: "Apr", reviews: 84, avg: 4.2 },
-  { month: "May", reviews: 110, avg: 4.4 },
-  { month: "Jun", reviews: 58, avg: 4.3 },
-];
+const RATING_COLORS: Record<number, string> = {
+  1: "#C62828",
+  2: "#B03A48",
+  3: "#D4AF37",
+  4: "#388E3C",
+  5: "#2E7D32",
+};
 
 type NavItem = { id: string; label: string; icon: React.ReactNode };
 
@@ -546,6 +537,39 @@ export function AdminDashboard({ onNavigate, services, onAddService, onUpdateSer
   const [serviceError, setServiceError] = useState("");
   const [serviceMessage, setServiceMessage] = useState("");
   const [editingServiceCode, setEditingServiceCode] = useState<string | null>(null);
+  const [recentReviews, setRecentReviews] = useState<FeedbackReview[]>([]);
+  const [feedbackSummary, setFeedbackSummary] = useState<FeedbackSummary>(EMPTY_FEEDBACK_SUMMARY);
+  const [feedbackError, setFeedbackError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadFeedback() {
+      try {
+        const [reviews, summary] = await Promise.all([
+          api.getRecentFeedback(8),
+          api.getFeedbackSummary(),
+        ]);
+        if (!cancelled) {
+          setRecentReviews(reviews);
+          setFeedbackSummary(summary);
+          setFeedbackError("");
+        }
+      } catch {
+        if (!cancelled) {
+          setRecentReviews([]);
+          setFeedbackSummary(EMPTY_FEEDBACK_SUMMARY);
+          setFeedbackError("Feedback data is unavailable.");
+        }
+      }
+    }
+
+    loadFeedback();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function navigate(id: string) {
     if (id === "analytics") { onNavigate("analytics"); return; }
@@ -626,11 +650,17 @@ export function AdminDashboard({ onNavigate, services, onAddService, onUpdateSer
 
   const selectedYearUsage = tokenUsageByYear[selectedTokenYear] || {};
   const selectedYearTokenTotal = Object.values(selectedYearUsage).reduce((sum, count) => sum + count, 0);
+  const ratingDistribution = feedbackSummary.ratingDistribution.map((entry) => ({
+    name: `${entry.rating} \u2605`,
+    count: entry.count,
+    fill: RATING_COLORS[entry.rating] || "var(--gov-maroon)",
+  }));
+  const monthlyTrend = feedbackSummary.monthlyTrend;
   const stats = [
     { label: `Tokens in ${selectedTokenYear}`, value: String(selectedYearTokenTotal), icon: <FileText size={22} />, color: "var(--gov-maroon)", bg: "#FFF0F3" },
-    { label: "Average Rating", value: "4.3 ★", icon: <Star size={22} />, color: "var(--gov-gold)", bg: "#FFFDE7" },
-    { label: "Positive Reviews", value: "42", icon: <ThumbsUp size={22} />, color: "var(--gov-success)", bg: "#E8F5E9" },
-    { label: "Negative Reviews", value: "8", icon: <ThumbsDown size={22} />, color: "#C62828", bg: "#FFEBEE" },
+    { label: "Average Rating", value: `${feedbackSummary.averageRating.toFixed(1)} \u2605`, icon: <Star size={22} />, color: "var(--gov-gold)", bg: "#FFFDE7" },
+    { label: "Positive Reviews", value: String(feedbackSummary.positive), icon: <ThumbsUp size={22} />, color: "var(--gov-success)", bg: "#E8F5E9" },
+    { label: "Negative Reviews", value: String(feedbackSummary.negative), icon: <ThumbsDown size={22} />, color: "#C62828", bg: "#FFEBEE" },
   ];
   const activeLabel = NAV.find((item) => item.id === active)?.label ?? "Dashboard";
 
@@ -877,7 +907,7 @@ export function AdminDashboard({ onNavigate, services, onAddService, onUpdateSer
                 Star Rating Distribution
               </h3>
               <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={RATING_DIST} barSize={32}>
+                <BarChart data={ratingDistribution} barSize={32}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                   <XAxis dataKey="name" tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
@@ -886,7 +916,7 @@ export function AdminDashboard({ onNavigate, services, onAddService, onUpdateSer
                     cursor={{ fill: "var(--muted)", opacity: 0.4 }}
                   />
                   <Bar dataKey="count" radius={[6, 6, 0, 0]}>
-                    {RATING_DIST.map((entry, i) => (
+                    {ratingDistribution.map((entry, i) => (
                       <Cell key={i} fill={entry.fill} />
                     ))}
                   </Bar>
@@ -906,7 +936,7 @@ export function AdminDashboard({ onNavigate, services, onAddService, onUpdateSer
                 Monthly Feedback Trend
               </h3>
               <ResponsiveContainer width="100%" height={200}>
-                <LineChart data={MONTHLY}>
+                <LineChart data={monthlyTrend}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                   <XAxis dataKey="month" tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
@@ -961,7 +991,18 @@ export function AdminDashboard({ onNavigate, services, onAddService, onUpdateSer
                   </tr>
                 </thead>
                 <tbody>
-                  {REVIEWS.map((r, i) => (
+                  {recentReviews.length === 0 && (
+                    <tr className="border-t" style={{ borderColor: "var(--border)" }}>
+                      <td
+                        colSpan={5}
+                        className="px-5 py-8 text-center text-sm"
+                        style={{ color: "var(--muted-foreground)" }}
+                      >
+                        {feedbackError || "No feedback has been submitted yet."}
+                      </td>
+                    </tr>
+                  )}
+                  {recentReviews.map((r) => (
                     <tr
                       key={r.id}
                       className="border-t transition-colors hover:bg-[#FAF8F6]"
