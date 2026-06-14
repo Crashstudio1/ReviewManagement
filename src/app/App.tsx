@@ -1,0 +1,277 @@
+import { useState, useCallback, useEffect } from "react";
+import { HomeScreen } from "./components/HomeScreen";
+import { DEFAULT_SERVICES, ServiceSelection, type Service } from "./components/ServiceSelection";
+import { TokenGenerated } from "./components/TokenGenerated";
+import { ReviewScreen } from "./components/ReviewScreen";
+import { ThankYouScreen } from "./components/ThankYouScreen";
+import { AdminLogin } from "./components/AdminLogin";
+import { AdminDashboard } from "./components/AdminDashboard";
+import { AnalyticsPage } from "./components/AnalyticsPage";
+import { api, type TokenUsageByYear } from "./api";
+
+/* MARKER-MAKE-KIT-INVOKED */
+
+type Screen =
+  | "home"
+  | "service-select"
+  | "token-generated"
+  | "review"
+  | "thank-you"
+  | "admin-login"
+  | "admin-dashboard"
+  | "analytics";
+
+interface GeneratedToken {
+  token: string;
+  serviceName: string;
+  serviceEmoji: string;
+}
+
+const SERVICES_STORAGE_KEY = "gov-citizen-review-services";
+const TOKEN_USAGE_STORAGE_KEY = "gov-citizen-review-token-usage";
+
+function loadServices() {
+  try {
+    const saved = window.localStorage.getItem(SERVICES_STORAGE_KEY);
+    if (!saved) return DEFAULT_SERVICES;
+    const parsed = JSON.parse(saved);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_SERVICES;
+  } catch {
+    return DEFAULT_SERVICES;
+  }
+}
+
+function loadTokenUsage(): TokenUsageByYear {
+  try {
+    const saved = window.localStorage.getItem(TOKEN_USAGE_STORAGE_KEY);
+    if (!saved) return {};
+    const parsed = JSON.parse(saved);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+export default function App() {
+  const [screen, setScreen] = useState<Screen>("home");
+  const [services, setServices] = useState<Service[]>(loadServices);
+  const [tokenCounters, setTokenCounters] = useState<Record<string, number>>({});
+  const [tokenUsageByYear, setTokenUsageByYear] = useState<TokenUsageByYear>(loadTokenUsage);
+  const [generatedToken, setGeneratedToken] = useState<GeneratedToken | null>(null);
+  const [submittedRating, setSubmittedRating] = useState(5);
+  // Track logo tap count for hidden admin entry
+  const [logoTaps, setLogoTaps] = useState(0);
+
+  const goHome = useCallback(() => setScreen("home"), []);
+
+  useEffect(() => {
+    window.localStorage.setItem(SERVICES_STORAGE_KEY, JSON.stringify(services));
+  }, [services]);
+
+  useEffect(() => {
+    window.localStorage.setItem(TOKEN_USAGE_STORAGE_KEY, JSON.stringify(tokenUsageByYear));
+  }, [tokenUsageByYear]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    api.getServices()
+      .then((apiServices) => {
+        if (!cancelled && apiServices.length > 0) {
+          setServices(apiServices);
+        }
+      })
+      .catch(() => {
+        // MySQL API is optional for demo mode; localStorage remains the fallback.
+      });
+
+    api.getTokenUsageByYear()
+      .then((usage) => {
+        if (!cancelled) {
+          setTokenUsageByYear(usage);
+        }
+      })
+      .catch(() => {
+        // Keep local yearly usage when the API is not available.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function recordTokenUsage(year: string, serviceCode: string) {
+    setTokenUsageByYear((prev) => {
+      const yearUsage = prev[year] || {};
+      return {
+        ...prev,
+        [year]: {
+          ...yearUsage,
+          [serviceCode]: (yearUsage[serviceCode] || 0) + 1,
+        },
+      };
+    });
+  }
+
+  async function handleSelectService(svc: Service) {
+    try {
+      const issued = await api.issueToken(svc);
+      const numericTokenPart = Number(issued.token.replace(svc.code, ""));
+      if (Number.isFinite(numericTokenPart)) {
+        setTokenCounters((prev) => ({
+          ...prev,
+          [svc.code]: Math.max(prev[svc.code] || 0, numericTokenPart),
+        }));
+      }
+      recordTokenUsage(String(issued.issuedYear), svc.code);
+      setGeneratedToken({
+        token: issued.token,
+        serviceName: issued.service.en,
+        serviceEmoji: issued.service.emoji,
+      });
+      setScreen("token-generated");
+      return;
+    } catch {
+      // Fall back to local token issuing when the MySQL API is unavailable.
+    }
+
+    const next = (tokenCounters[svc.code] || 0) + 1;
+    const token = `${svc.code}${String(next).padStart(3, "0")}`;
+    setTokenCounters((prev) => ({ ...prev, [svc.code]: next }));
+    recordTokenUsage(String(new Date().getFullYear()), svc.code);
+    setGeneratedToken({ token, serviceName: svc.en, serviceEmoji: svc.emoji });
+    setScreen("token-generated");
+  }
+
+  function handleReviewSubmit(rating: number, comment = "", mobile = "") {
+    api.submitFeedback({ rating, comment, mobile }).catch(() => {
+      // Feedback still completes in offline/demo mode.
+    });
+    setSubmittedRating(rating);
+    setScreen("thank-you");
+  }
+
+  async function handleAddService(service: Service) {
+    try {
+      const saved = await api.addService(service);
+      setServices((prev) => [...prev, saved]);
+      return saved;
+    } catch {
+      setServices((prev) => [...prev, service]);
+      return service;
+    }
+  }
+
+  // Secret admin entry: tap the footer 5 times on the home screen
+  function handleFooterTap() {
+    const next = logoTaps + 1;
+    setLogoTaps(next);
+    if (next >= 5) {
+      setLogoTaps(0);
+      setScreen("admin-login");
+    }
+  }
+
+  return (
+    <div
+      className="size-full overflow-auto"
+      style={{ fontFamily: "'Noto Sans Tamil', 'Inter', sans-serif" }}
+    >
+      {screen === "home" && (
+        <div className="flex flex-col min-h-screen">
+          <div className="flex-1">
+            <HomeScreen
+              onGetToken={() => setScreen("service-select")}
+              onGiveFeedback={() => setScreen("review")}
+            />
+          </div>
+          {/* Hidden admin entry — tap footer 5× */}
+          <div
+            className="fixed bottom-0 left-0 right-0 flex items-center justify-center"
+            style={{ zIndex: 50 }}
+          >
+            <button
+              onClick={handleFooterTap}
+              className="px-6 py-1 text-xs opacity-0 hover:opacity-0 focus:opacity-0 select-none"
+              tabIndex={-1}
+              aria-hidden="true"
+            >
+              .
+            </button>
+          </div>
+          {/* Visible admin link for demo */}
+          <div className="fixed bottom-4 right-4 z-50">
+            <button
+              onClick={() => setScreen("admin-login")}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold shadow-lg transition-all duration-150 active:scale-95"
+              style={{
+                background: "rgba(60,0,16,0.9)",
+                color: "rgba(212,175,55,0.9)",
+                border: "1px solid rgba(212,175,55,0.3)",
+                backdropFilter: "blur(8px)",
+              }}
+              onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "rgba(128,0,32,0.95)")}
+              onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "rgba(60,0,16,0.9)")}
+            >
+              🔒 Admin
+            </button>
+          </div>
+        </div>
+      )}
+
+      {screen === "service-select" && (
+        <ServiceSelection
+          onSelect={handleSelectService}
+          onBack={goHome}
+          tokenCounters={tokenCounters}
+          services={services}
+        />
+      )}
+
+      {screen === "token-generated" && generatedToken && (
+        <TokenGenerated
+          token={generatedToken.token}
+          serviceName={generatedToken.serviceName}
+          serviceEmoji={generatedToken.serviceEmoji}
+          onHome={goHome}
+        />
+      )}
+
+      {screen === "review" && (
+        <ReviewScreen
+          onSubmit={handleReviewSubmit}
+          onBack={goHome}
+        />
+      )}
+
+      {screen === "thank-you" && (
+        <ThankYouScreen
+          rating={submittedRating}
+          onHome={goHome}
+        />
+      )}
+
+      {screen === "admin-login" && (
+        <AdminLogin
+          onLogin={() => setScreen("admin-dashboard")}
+          onBack={goHome}
+        />
+      )}
+
+      {screen === "admin-dashboard" && (
+        <AdminDashboard
+          onNavigate={(p) => setScreen(p as Screen)}
+          services={services}
+          onAddService={handleAddService}
+          tokenUsageByYear={tokenUsageByYear}
+        />
+      )}
+
+      {screen === "analytics" && (
+        <AnalyticsPage
+          onBack={() => setScreen("admin-dashboard")}
+        />
+      )}
+    </div>
+  );
+}
