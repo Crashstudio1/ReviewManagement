@@ -6,7 +6,7 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite",
-    "api": "node backend/server.js",
+    "api": "node backend/start-server.js",
     "db:init": "node backend/init-db.js",
     "db:check": "node backend/check-db.js",
     "test": "node --test"

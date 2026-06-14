@@ -1,10 +1,12 @@
 import "dotenv/config";
-import { pathToFileURL } from "node:url";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import cors from "cors";
 import express from "express";
 import { pool } from "./db.js";
 
 const port = Number(process.env.API_PORT || 4000);
+const currentFile = fileURLToPath(import.meta.url);
 
 function toService(row) {
   return {
@@ -654,9 +656,13 @@ app.use((error, _req, res, _next) => {
   return app;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const app = createApp();
-  app.listen(port, () => {
+export function startServer(apiPool = pool) {
+  const app = createApp(apiPool);
+  return app.listen(port, () => {
     console.log(`Government Citizen Review API running on http://localhost:${port}`);
   });
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(currentFile)) {
+  startServer();
 }
