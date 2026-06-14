@@ -2,7 +2,7 @@ import { useState } from "react";
 import {
   BarChart2, Users, Star, ThumbsUp, ThumbsDown,
   LayoutDashboard, FileText, Settings, LogOut,
-  TrendingUp, MessageSquare, ChevronRight, Menu, X, PlusCircle
+  TrendingUp, MessageSquare, ChevronRight, Menu, X, PlusCircle, Pencil, Save, RotateCcw
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -111,8 +111,11 @@ interface ServicesAdminPanelProps {
   suggestedCode: string;
   error: string;
   message: string;
+  editingServiceCode: string | null;
   onChange: (field: keyof Service, value: string) => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+  onEditService: (service: Service) => void;
+  onCancelEdit: () => void;
 }
 
 type TokenUsageByYear = Record<string, Record<string, number>>;
@@ -123,9 +126,13 @@ function ServicesAdminPanel({
   suggestedCode,
   error,
   message,
+  editingServiceCode,
   onChange,
   onSubmit,
+  onEditService,
+  onCancelEdit,
 }: ServicesAdminPanelProps) {
+  const isEditing = Boolean(editingServiceCode);
   const inputStyle: React.CSSProperties = {
     border: "1.5px solid var(--border)",
     color: "var(--foreground)",
@@ -140,7 +147,7 @@ function ServicesAdminPanel({
             Service Details
           </h2>
           <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
-            Add services in English, Tamil, and Sinhala for the citizen kiosk.
+            Add or update services in English, Tamil, and Sinhala for the citizen kiosk.
           </p>
         </div>
         <div
@@ -161,14 +168,14 @@ function ServicesAdminPanel({
               className="flex h-11 w-11 items-center justify-center rounded-xl"
               style={{ background: "#FFF0F3", color: "var(--gov-maroon)" }}
             >
-              <PlusCircle size={22} />
+              {isEditing ? <Pencil size={22} /> : <PlusCircle size={22} />}
             </div>
             <div>
               <h3 className="font-semibold" style={{ color: "var(--gov-maroon)" }}>
-                Add New Service
+                {isEditing ? "Edit Service" : "Add New Service"}
               </h3>
               <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-                Suggested next code: {suggestedCode}
+                {isEditing ? `Editing service code: ${editingServiceCode}` : `Suggested next code: ${suggestedCode}`}
               </p>
             </div>
           </div>
@@ -222,9 +229,24 @@ function ServicesAdminPanel({
             className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white shadow-md transition-all active:scale-[0.98]"
             style={{ background: "linear-gradient(135deg, var(--gov-maroon-dark) 0%, var(--gov-maroon) 100%)" }}
           >
-            <PlusCircle size={17} />
-            Add Service
+            {isEditing ? <Save size={17} /> : <PlusCircle size={17} />}
+            {isEditing ? "Save Changes" : "Add Service"}
           </button>
+          {isEditing && (
+            <button
+              type="button"
+              onClick={onCancelEdit}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition-all active:scale-[0.98]"
+              style={{
+                background: "#fff",
+                border: "1.5px solid var(--border)",
+                color: "var(--gov-maroon)",
+              }}
+            >
+              <RotateCcw size={16} />
+              Cancel Edit
+            </button>
+          )}
         </div>
 
         <div
@@ -297,7 +319,7 @@ function ServicesAdminPanel({
           <table className="w-full">
             <thead>
               <tr style={{ background: "var(--gov-cream)" }}>
-                {["Code", "Icon", "English", "Tamil", "Sinhala"].map((header) => (
+                {["Code", "Icon", "English", "Tamil", "Sinhala", "Actions"].map((header) => (
                   <th
                     key={header}
                     className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide"
@@ -329,6 +351,20 @@ function ServicesAdminPanel({
                     style={{ color: "var(--foreground)", fontFamily: "'Noto Sans Sinhala', 'Inter', sans-serif" }}
                   >
                     {service.si}
+                  </td>
+                  <td className="px-5 py-3.5">
+                    <button
+                      type="button"
+                      onClick={() => onEditService(service)}
+                      className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition-colors"
+                      style={{
+                        background: editingServiceCode === service.code ? "var(--gov-maroon)" : "var(--gov-cream)",
+                        color: editingServiceCode === service.code ? "#fff" : "var(--gov-maroon)",
+                      }}
+                    >
+                      <Pencil size={14} />
+                      Edit
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -491,10 +527,11 @@ interface AdminDashboardProps {
   onNavigate: (page: string) => void;
   services: Service[];
   onAddService: (service: Service) => Promise<Service> | Service;
+  onUpdateService: (currentCode: string, service: Service) => Promise<Service> | Service;
   tokenUsageByYear: TokenUsageByYear;
 }
 
-export function AdminDashboard({ onNavigate, services, onAddService, tokenUsageByYear }: AdminDashboardProps) {
+export function AdminDashboard({ onNavigate, services, onAddService, onUpdateService, tokenUsageByYear }: AdminDashboardProps) {
   const [active, setActive] = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedTokenYear, setSelectedTokenYear] = useState(String(new Date().getFullYear()));
@@ -508,6 +545,7 @@ export function AdminDashboard({ onNavigate, services, onAddService, tokenUsageB
   });
   const [serviceError, setServiceError] = useState("");
   const [serviceMessage, setServiceMessage] = useState("");
+  const [editingServiceCode, setEditingServiceCode] = useState<string | null>(null);
 
   function navigate(id: string) {
     if (id === "analytics") { onNavigate("analytics"); return; }
@@ -521,11 +559,35 @@ export function AdminDashboard({ onNavigate, services, onAddService, tokenUsageB
     setServiceMessage("");
   }
 
+  function resetServiceForm(nextServices = services) {
+    setServiceForm({
+      emoji: "\uD83D\uDCCB",
+      code: getNextServiceCode(nextServices),
+      en: "",
+      ta: "",
+      si: "",
+    });
+    setEditingServiceCode(null);
+  }
+
+  function handleEditService(service: Service) {
+    setEditingServiceCode(service.code.trim().toUpperCase());
+    setServiceForm({ ...service, code: service.code.trim().toUpperCase() });
+    setServiceError("");
+    setServiceMessage("");
+  }
+
+  function handleCancelEdit() {
+    resetServiceForm();
+    setServiceError("");
+    setServiceMessage("");
+  }
+
   async function handleAddService(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const nextService: Service = {
-      emoji: serviceForm.emoji.trim() || "📋",
+      emoji: serviceForm.emoji.trim() || "\uD83D\uDCCB",
       code: serviceForm.code.trim().toUpperCase(),
       en: serviceForm.en.trim(),
       ta: serviceForm.ta.trim(),
@@ -538,22 +600,27 @@ export function AdminDashboard({ onNavigate, services, onAddService, tokenUsageB
     }
 
     const duplicateCode = services.some(
-      (service) => service.code.trim().toUpperCase() === nextService.code,
+      (service) => service.code.trim().toUpperCase() === nextService.code
+        && service.code.trim().toUpperCase() !== editingServiceCode,
     );
     if (duplicateCode) {
       setServiceError(`Service code ${nextService.code} is already used.`);
       return;
     }
 
+    if (editingServiceCode) {
+      const savedService = await onUpdateService(editingServiceCode, nextService);
+      const updatedServices = services.map((service) => (
+        service.code.trim().toUpperCase() === editingServiceCode ? savedService : service
+      ));
+      resetServiceForm(updatedServices);
+      setServiceMessage(`${savedService.en} was updated in the kiosk service list.`);
+      return;
+    }
+
     const savedService = await onAddService(nextService);
     const updatedServices = [...services, savedService];
-    setServiceForm({
-      emoji: "📋",
-      code: getNextServiceCode(updatedServices),
-      en: "",
-      ta: "",
-      si: "",
-    });
+    resetServiceForm(updatedServices);
     setServiceMessage(`${savedService.en} was added to the kiosk service list.`);
   }
 
@@ -579,23 +646,39 @@ export function AdminDashboard({ onNavigate, services, onAddService, tokenUsageB
 
       {/* Sidebar */}
       <aside
-        className="fixed lg:static z-30 top-0 left-0 h-full flex flex-col transition-transform duration-300"
+        className={`fixed lg:static z-30 top-0 left-0 h-full flex flex-col transition-transform duration-300 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+        }`}
         style={{
           width: 240,
           background: "linear-gradient(180deg, #21000A 0%, #4D0015 48%, #7A001F 100%)",
           borderRight: "2px solid rgba(212,175,55,0.38)",
           boxShadow: "12px 0 32px rgba(61,0,16,0.22)",
-          transform: sidebarOpen ? "translateX(0)" : undefined,
         }}
       >
         {/* Sidebar header */}
         <div className="px-5 py-6 border-b" style={{ borderColor: "rgba(212,175,55,0.28)" }}>
-          <div className="flex items-center gap-3">
-            <GovernmentLogo className="h-12 w-12 rounded-xl p-0.5" />
-            <div>
-              <p className="text-white font-semibold text-sm leading-tight">Pradeshiya Sabha</p>
-              <p className="text-white/60 text-xs">Admin Panel</p>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <GovernmentLogo className="h-12 w-12 rounded-xl p-0.5" />
+              <div className="min-w-0">
+                <p className="text-white font-semibold text-sm leading-tight">Pradeshiya Sabha</p>
+                <p className="text-white/60 text-xs">Admin Panel</p>
+              </div>
             </div>
+            <button
+              type="button"
+              aria-label="Close sidebar"
+              onClick={() => setSidebarOpen(false)}
+              className="lg:hidden flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors"
+              style={{
+                background: "rgba(255,255,255,0.08)",
+                color: "#fff",
+                border: "1px solid rgba(212,175,55,0.24)",
+              }}
+            >
+              <X size={18} />
+            </button>
           </div>
         </div>
 
@@ -675,6 +758,8 @@ export function AdminDashboard({ onNavigate, services, onAddService, tokenUsageB
         >
           <div className="flex items-center gap-3">
             <button
+              type="button"
+              aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
               className="lg:hidden p-1.5 rounded-lg hover:bg-gray-100"
               onClick={() => setSidebarOpen(!sidebarOpen)}
             >
@@ -712,8 +797,11 @@ export function AdminDashboard({ onNavigate, services, onAddService, tokenUsageB
               suggestedCode={suggestedCode}
               error={serviceError}
               message={serviceMessage}
+              editingServiceCode={editingServiceCode}
               onChange={updateServiceForm}
               onSubmit={handleAddService}
+              onEditService={handleEditService}
+              onCancelEdit={handleCancelEdit}
             />
           ) : (
             <>

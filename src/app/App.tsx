@@ -162,6 +162,49 @@ export default function App() {
     }
   }
 
+  async function handleUpdateService(currentCode: string, service: Service) {
+    const oldCode = currentCode.trim().toUpperCase();
+    let saved = service;
+
+    try {
+      saved = await api.updateService(currentCode, service);
+    } catch {
+      // Keep service editing available in offline/demo mode.
+    }
+
+    const newCode = saved.code.trim().toUpperCase();
+    setServices((prev) => prev.map((item) => (
+      item.code.trim().toUpperCase() === oldCode ? saved : item
+    )));
+
+    if (oldCode !== newCode) {
+      setTokenCounters((prev) => {
+        const { [oldCode]: oldCount, ...rest } = prev;
+        if (oldCount === undefined) return rest;
+        return {
+          ...rest,
+          [newCode]: Math.max(rest[newCode] || 0, oldCount),
+        };
+      });
+
+      setTokenUsageByYear((prev) => {
+        const nextUsage: TokenUsageByYear = {};
+        for (const [year, usage] of Object.entries(prev)) {
+          const { [oldCode]: oldTotal, ...rest } = usage;
+          nextUsage[year] = oldTotal === undefined
+            ? rest
+            : {
+                ...rest,
+                [newCode]: (rest[newCode] || 0) + oldTotal,
+              };
+        }
+        return nextUsage;
+      });
+    }
+
+    return saved;
+  }
+
   // Secret admin entry: tap the footer 5 times on the home screen
   function handleFooterTap() {
     const next = logoTaps + 1;
@@ -263,6 +306,7 @@ export default function App() {
           onNavigate={(p) => setScreen(p as Screen)}
           services={services}
           onAddService={handleAddService}
+          onUpdateService={handleUpdateService}
           tokenUsageByYear={tokenUsageByYear}
         />
       )}

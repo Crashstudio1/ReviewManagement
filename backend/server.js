@@ -1,13 +1,10 @@
 import "dotenv/config";
+import { pathToFileURL } from "node:url";
 import cors from "cors";
 import express from "express";
 import { pool } from "./db.js";
 
-const app = express();
 const port = Number(process.env.API_PORT || 4000);
-
-app.use(cors({ origin: process.env.CORS_ORIGIN || true }));
-app.use(express.json({ limit: "1mb" }));
 
 function toService(row) {
   return {
@@ -37,9 +34,15 @@ function requireServiceFields(service) {
   }
 }
 
+export function createApp(apiPool = pool) {
+  const app = express();
+
+  app.use(cors({ origin: process.env.CORS_ORIGIN || true }));
+  app.use(express.json({ limit: "1mb" }));
+
 app.get("/api/health", async (_req, res, next) => {
   try {
-    await pool.query("SELECT 1");
+    await apiPool.query("SELECT 1");
     res.json({ ok: true });
   } catch (error) {
     next(error);
@@ -48,7 +51,7 @@ app.get("/api/health", async (_req, res, next) => {
 
 app.get("/api/services", async (_req, res, next) => {
   try {
-    const [rows] = await pool.query(
+    const [rows] = await apiPool.query(
       `SELECT code, emoji, name_ta, name_si, name_en
        FROM services
        WHERE active = 1
@@ -65,13 +68,41 @@ app.post("/api/services", async (req, res, next) => {
     const service = normalizeService(req.body);
     requireServiceFields(service);
 
-    await pool.query(
+    await apiPool.query(
       `INSERT INTO services (code, emoji, name_ta, name_si, name_en)
        VALUES (?, ?, ?, ?, ?)`,
       [service.code, service.emoji, service.ta, service.si, service.en],
     );
 
     res.status(201).json(service);
+  } catch (error) {
+    if (error?.code === "ER_DUP_ENTRY") {
+      error.status = 409;
+      error.message = "Service code is already used.";
+    }
+    next(error);
+  }
+});
+
+app.put("/api/services/:code", async (req, res, next) => {
+  try {
+    const currentCode = String(req.params.code || "").trim().toUpperCase();
+    const service = normalizeService(req.body);
+    requireServiceFields(service);
+
+    const [result] = await apiPool.query(
+      `UPDATE services
+       SET code = ?, emoji = ?, name_ta = ?, name_si = ?, name_en = ?, active = 1
+       WHERE code = ?`,
+      [service.code, service.emoji, service.ta, service.si, service.en, currentCode],
+    );
+
+    if (result.affectedRows === 0) {
+      res.status(404).json({ error: "Service was not found." });
+      return;
+    }
+
+    res.json(service);
   } catch (error) {
     if (error?.code === "ER_DUP_ENTRY") {
       error.status = 409;
@@ -90,7 +121,7 @@ app.post("/api/tokens", async (req, res, next) => {
     return;
   }
 
-  const connection = await pool.getConnection();
+  const connection = await apiPool.getConnection();
 
   try {
     await connection.beginTransaction();
@@ -159,7 +190,7 @@ app.post("/api/tokens", async (req, res, next) => {
 
 app.get("/api/tokens/usage/by-year", async (_req, res, next) => {
   try {
-    const [rows] = await pool.query(
+    const [rows] = await apiPool.query(
       `SELECT issued_year, service_code, COUNT(*) AS total
        FROM token_issues
        GROUP BY issued_year, service_code
@@ -190,7 +221,7 @@ app.post("/api/feedback", async (req, res, next) => {
       return;
     }
 
-    const [result] = await pool.query(
+    const [result] = await apiPool.query(
       `INSERT INTO feedback (rating, comment, mobile)
        VALUES (?, ?, ?)`,
       [rating, comment || null, mobile || null],
@@ -210,6 +241,12 @@ app.use((error, _req, res, _next) => {
   res.status(status).json({ error: error.message || "Server error" });
 });
 
-app.listen(port, () => {
-  console.log(`Government Citizen Review API running on http://localhost:${port}`);
-});
+  return app;
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const app = createApp();
+  app.listen(port, () => {
+    console.log(`Government Citizen Review API running on http://localhost:${port}`);
+  });
+}

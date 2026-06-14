@@ -39,6 +39,13 @@ export const api = {
     });
   },
 
+  updateService(currentCode: string, service: Service) {
+    return request<Service>(`/services/${encodeURIComponent(currentCode)}`, {
+      method: "PUT",
+      body: JSON.stringify(service),
+    });
+  },
+
   issueToken(service: Service) {
     return request<{ token: string; service: Service; issuedYear: number }>("/tokens", {
       method: "POST",

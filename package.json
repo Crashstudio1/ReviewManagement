@@ -7,7 +7,9 @@
     "build": "vite build",
     "dev": "vite",
     "api": "node backend/server.js",
-    "db:init": "node backend/init-db.js"
+    "db:init": "node backend/init-db.js",
+    "db:check": "node backend/check-db.js",
+    "test": "node --test"
   },
   "dependencies": {
     "@emotion/react": "11.14.0",

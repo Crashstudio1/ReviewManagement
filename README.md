@@ -9,6 +9,12 @@ Run `npm i` to install the dependencies.
 
 Run `npm run dev` to start the frontend development server.
 
+Run the automated test cases:
+
+```powershell
+npm test
+```
+
 ## MySQL backend
 
 1. Create a `.env` file from `.env.example` and update the MySQL username/password.
@@ -19,13 +25,19 @@ Run `npm run dev` to start the frontend development server.
 npm run db:init
 ```
 
-4. Start the API server:
+4. Check the database connection:
+
+```powershell
+npm run db:check
+```
+
+5. Start the API server:
 
 ```powershell
 npm run api
 ```
 
-5. In another terminal, start the frontend:
+6. In another terminal, start the frontend:
 
 ```powershell
 npm run dev
