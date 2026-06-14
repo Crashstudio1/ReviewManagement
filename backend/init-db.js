@@ -1,5 +1,6 @@
 import { createPool, dbName } from "./db.js";
 import { defaultServices } from "./default-services.js";
+import { hashPassword } from "./auth.js";
 
 const bootstrapPool = createPool({ withDatabase: false });
 
@@ -57,7 +58,9 @@ const ddl = [
     name VARCHAR(120) NOT NULL,
     email VARCHAR(190) NOT NULL UNIQUE,
     role VARCHAR(64) NOT NULL DEFAULT 'Staff',
+    password_hash VARCHAR(255) NULL,
     active TINYINT(1) NOT NULL DEFAULT 1,
+    last_login_at TIMESTAMP NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_admin_users_active (active)
@@ -72,13 +75,33 @@ const defaultSettings = {
 };
 
 const defaultAdminUsers = [
-  { name: "Admin", email: "admin@example.com", role: "Administrator" },
+  {
+    name: process.env.ADMIN_NAME || "Admin",
+    email: (process.env.ADMIN_EMAIL || "admin@example.com").toLowerCase(),
+    role: "Administrator",
+  },
 ];
+
+async function addColumnIfMissing(sql) {
+  try {
+    await bootstrapPool.query(sql);
+  } catch (error) {
+    if (error?.code !== "ER_DUP_FIELDNAME") throw error;
+  }
+}
 
 try {
   for (const statement of ddl) {
     await bootstrapPool.query(statement);
   }
+  await addColumnIfMissing(
+    `ALTER TABLE admin_users
+     ADD COLUMN password_hash VARCHAR(255) NULL AFTER role`,
+  );
+  await addColumnIfMissing(
+    `ALTER TABLE admin_users
+     ADD COLUMN last_login_at TIMESTAMP NULL AFTER active`,
+  );
   for (const service of defaultServices) {
     await bootstrapPool.query(
       `INSERT INTO services (code, emoji, name_ta, name_si, name_en)
@@ -100,12 +123,17 @@ try {
       [key, value],
     );
   }
+  const defaultPasswordHash = await hashPassword(process.env.ADMIN_PASSWORD || "Admin@12345");
   for (const user of defaultAdminUsers) {
     await bootstrapPool.query(
-      `INSERT INTO admin_users (name, email, role)
-       VALUES (?, ?, ?)
-       ON DUPLICATE KEY UPDATE name = VALUES(name), role = VALUES(role), active = 1`,
-      [user.name, user.email, user.role],
+      `INSERT INTO admin_users (name, email, role, password_hash)
+       VALUES (?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         name = VALUES(name),
+         role = VALUES(role),
+         active = 1,
+         password_hash = COALESCE(password_hash, VALUES(password_hash))`,
+      [user.name, user.email, user.role, defaultPasswordHash],
     );
   }
   console.log(`MySQL database ready: ${dbName}`);
