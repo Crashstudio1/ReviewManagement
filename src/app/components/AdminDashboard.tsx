@@ -3,7 +3,7 @@ import {
   BarChart2, Users, Star, ThumbsUp, ThumbsDown,
   LayoutDashboard, FileText, Settings, LogOut,
   TrendingUp, MessageSquare, ChevronRight, Menu, X, PlusCircle, Pencil, Save, RotateCcw,
-  Download, RefreshCw, UserPlus
+  Download, RefreshCw, Trash2, UserPlus
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -16,6 +16,7 @@ import {
   api,
   type AdminSettings,
   type AdminUser,
+  type AuthUser,
   type FeedbackReview,
   type FeedbackSummary,
   type TokenReportRow,
@@ -134,6 +135,7 @@ interface ServicesAdminPanelProps {
   onChange: (field: keyof Service, value: string) => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
   onEditService: (service: Service) => void;
+  onDeleteService: (service: Service) => void;
   onCancelEdit: () => void;
 }
 
@@ -149,6 +151,7 @@ function ServicesAdminPanel({
   onChange,
   onSubmit,
   onEditService,
+  onDeleteService,
   onCancelEdit,
 }: ServicesAdminPanelProps) {
   const isEditing = Boolean(editingServiceCode);
@@ -372,18 +375,29 @@ function ServicesAdminPanel({
                     {service.si}
                   </td>
                   <td className="px-5 py-3.5">
-                    <button
-                      type="button"
-                      onClick={() => onEditService(service)}
-                      className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition-colors"
-                      style={{
-                        background: editingServiceCode === service.code ? "var(--gov-maroon)" : "var(--gov-cream)",
-                        color: editingServiceCode === service.code ? "#fff" : "var(--gov-maroon)",
-                      }}
-                    >
-                      <Pencil size={14} />
-                      Edit
-                    </button>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => onEditService(service)}
+                        className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition-colors"
+                        style={{
+                          background: editingServiceCode === service.code ? "var(--gov-maroon)" : "var(--gov-cream)",
+                          color: editingServiceCode === service.code ? "#fff" : "var(--gov-maroon)",
+                        }}
+                      >
+                        <Pencil size={14} />
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onDeleteService(service)}
+                        className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition-colors"
+                        style={{ background: "#FFEBEE", color: "#C62828" }}
+                      >
+                        <Trash2 size={14} />
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -759,9 +773,9 @@ function UsersAdminPanel({
   onToggleUser,
 }: {
   users: AdminUser[];
-  form: { name: string; email: string; role: string };
+  form: { name: string; email: string; role: string; password: string };
   error: string;
-  onFormChange: (form: { name: string; email: string; role: string }) => void;
+  onFormChange: (form: { name: string; email: string; role: string; password: string }) => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
   onToggleUser: (user: AdminUser) => void;
 }) {
@@ -771,7 +785,7 @@ function UsersAdminPanel({
         <h2 className="font-semibold" style={{ color: "var(--gov-maroon)", fontSize: "1.15rem" }}>Users</h2>
         <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Manage admin users who can operate the dashboard.</p>
       </div>
-      <form onSubmit={onSubmit} className="grid grid-cols-1 gap-4 rounded-2xl p-5 shadow-sm lg:grid-cols-[1fr_1fr_0.7fr_auto]" style={{ background: "#fff", border: "1px solid var(--border)" }}>
+      <form onSubmit={onSubmit} className="grid grid-cols-1 gap-4 rounded-2xl p-5 shadow-sm lg:grid-cols-[1fr_1fr_0.9fr_0.7fr_auto]" style={{ background: "#fff", border: "1px solid var(--border)" }}>
         <input
           value={form.name}
           onChange={(event) => onFormChange({ ...form, name: event.target.value })}
@@ -784,6 +798,14 @@ function UsersAdminPanel({
           value={form.email}
           onChange={(event) => onFormChange({ ...form, email: event.target.value })}
           placeholder="Email address"
+          className="rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2"
+          style={{ border: "1.5px solid var(--border)", "--tw-ring-color": "var(--gov-maroon)" } as React.CSSProperties}
+        />
+        <input
+          type="password"
+          value={form.password}
+          onChange={(event) => onFormChange({ ...form, password: event.target.value })}
+          placeholder="Temporary password"
           className="rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2"
           style={{ border: "1.5px solid var(--border)", "--tw-ring-color": "var(--gov-maroon)" } as React.CSSProperties}
         />
@@ -801,7 +823,7 @@ function UsersAdminPanel({
           <UserPlus size={16} />
           Add
         </button>
-        {error && <div className="lg:col-span-4 rounded-xl px-4 py-3 text-sm" style={{ background: "#FFEBEE", color: "#C62828" }}>{error}</div>}
+        {error && <div className="lg:col-span-5 rounded-xl px-4 py-3 text-sm" style={{ background: "#FFEBEE", color: "#C62828" }}>{error}</div>}
       </form>
 
       <div className="overflow-hidden rounded-2xl shadow-sm" style={{ background: "#fff", border: "1px solid var(--border)" }}>
@@ -849,13 +871,25 @@ function UsersAdminPanel({
 
 interface AdminDashboardProps {
   onNavigate: (page: string) => void;
+  onLogout: () => void;
+  adminUser: AuthUser;
   services: Service[];
   onAddService: (service: Service) => Promise<Service> | Service;
   onUpdateService: (currentCode: string, service: Service) => Promise<Service> | Service;
+  onDeleteService: (code: string) => Promise<void> | void;
   tokenUsageByYear: TokenUsageByYear;
 }
 
-export function AdminDashboard({ onNavigate, services, onAddService, onUpdateService, tokenUsageByYear }: AdminDashboardProps) {
+export function AdminDashboard({
+  onNavigate,
+  onLogout,
+  adminUser,
+  services,
+  onAddService,
+  onUpdateService,
+  onDeleteService,
+  tokenUsageByYear,
+}: AdminDashboardProps) {
   const [active, setActive] = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedTokenYear, setSelectedTokenYear] = useState(String(new Date().getFullYear()));
@@ -880,7 +914,7 @@ export function AdminDashboard({ onNavigate, services, onAddService, onUpdateSer
   const [settingsMessage, setSettingsMessage] = useState("");
   const [settingsError, setSettingsError] = useState("");
   const [users, setUsers] = useState<AdminUser[]>([]);
-  const [userForm, setUserForm] = useState({ name: "", email: "", role: "Staff" });
+  const [userForm, setUserForm] = useState({ name: "", email: "", role: "Staff", password: "" });
   const [userError, setUserError] = useState("");
 
   useEffect(() => {
@@ -959,7 +993,7 @@ export function AdminDashboard({ onNavigate, services, onAddService, onUpdateSer
     try {
       const saved = await api.addUser(userForm);
       setUsers((prev) => [saved, ...prev]);
-      setUserForm({ name: "", email: "", role: "Staff" });
+      setUserForm({ name: "", email: "", role: "Staff", password: "" });
     } catch (error) {
       setUserError(error instanceof Error ? error.message : "User could not be added.");
     }
@@ -1010,6 +1044,23 @@ export function AdminDashboard({ onNavigate, services, onAddService, onUpdateSer
     resetServiceForm();
     setServiceError("");
     setServiceMessage("");
+  }
+
+  async function handleDeleteService(service: Service) {
+    const confirmed = window.confirm(`Delete ${service.en} from the kiosk service list?`);
+    if (!confirmed) return;
+
+    try {
+      await onDeleteService(service.code);
+      if (editingServiceCode === service.code.trim().toUpperCase()) {
+        resetServiceForm(services.filter((item) => item.code !== service.code));
+      }
+      setServiceMessage(`${service.en} was removed from the kiosk service list.`);
+      setServiceError("");
+    } catch (error) {
+      setServiceMessage("");
+      setServiceError(error instanceof Error ? error.message : "Service could not be deleted.");
+    }
   }
 
   async function handleAddService(event: React.FormEvent<HTMLFormElement>) {
@@ -1156,7 +1207,7 @@ export function AdminDashboard({ onNavigate, services, onAddService, onUpdateSer
         <div className="px-3 pb-6 space-y-2">
           <div className="h-px mx-2 mb-3" style={{ background: "rgba(212,175,55,0.22)" }} />
           <button
-            onClick={() => onNavigate("admin-login")}
+            onClick={onLogout}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-colors text-left"
             style={{ color: "rgba(255,255,255,0.72)", background: "rgba(255,255,255,0.04)" }}
             onMouseEnter={(e) => {
@@ -1214,9 +1265,9 @@ export function AdminDashboard({ onNavigate, services, onAddService, onUpdateSer
               className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white"
               style={{ background: "var(--gov-maroon)" }}
             >
-              A
+              {(adminUser.name || adminUser.email || "A").slice(0, 1).toUpperCase()}
             </div>
-            <span className="text-sm hidden sm:block" style={{ color: "var(--foreground)" }}>Admin</span>
+            <span className="text-sm hidden sm:block" style={{ color: "var(--foreground)" }}>{adminUser.name}</span>
           </div>
         </header>
 
@@ -1236,6 +1287,7 @@ export function AdminDashboard({ onNavigate, services, onAddService, onUpdateSer
               onChange={updateServiceForm}
               onSubmit={handleAddService}
               onEditService={handleEditService}
+              onDeleteService={handleDeleteService}
               onCancelEdit={handleCancelEdit}
             />
           ) : active === "reports" ? (

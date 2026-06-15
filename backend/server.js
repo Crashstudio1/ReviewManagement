@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import cors from "cors";
 import express from "express";
+import { getJwtTtlSeconds, hashPassword, signJwt, verifyJwt, verifyPassword } from "./auth.js";
 import { pool } from "./db.js";
 
 const port = Number(process.env.API_PORT || 4000);
@@ -91,6 +92,20 @@ function toCsv(rows, columns) {
   ].join("\n");
 }
 
+function requireAdmin(req, res, next) {
+  const header = String(req.headers.authorization || "");
+  const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
+  const payload = verifyJwt(token);
+
+  if (!payload) {
+    res.status(401).json({ error: "Admin login is required." });
+    return;
+  }
+
+  req.admin = payload;
+  next();
+}
+
 export function createApp(apiPool = pool) {
   const app = express();
 
@@ -120,18 +135,86 @@ app.get("/api/services", async (_req, res, next) => {
   }
 });
 
-app.post("/api/services", async (req, res, next) => {
+app.post("/api/auth/login", async (req, res, next) => {
+  try {
+    const email = String(req.body.email || req.body.username || "").trim().toLowerCase();
+    const password = String(req.body.password || "");
+
+    if (!email || !password) {
+      res.status(400).json({ error: "Email and password are required." });
+      return;
+    }
+
+    const [rows] = await apiPool.query(
+      `SELECT id, name, email, role, password_hash, active
+       FROM admin_users
+       WHERE email = ?
+       LIMIT 1`,
+      [email],
+    );
+    const user = rows[0];
+    const passwordOk = user && Number(user.active) === 1
+      ? await verifyPassword(password, user.password_hash)
+      : false;
+
+    if (!passwordOk) {
+      res.status(401).json({ error: "Invalid email or password." });
+      return;
+    }
+
+    await apiPool.query(
+      `UPDATE admin_users
+       SET last_login_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [user.id],
+    );
+
+    const admin = toAdminUser(user);
+    const expiresIn = getJwtTtlSeconds();
+    const token = signJwt({
+      sub: admin.id,
+      name: admin.name,
+      email: admin.email,
+      role: admin.role,
+    }, { expiresIn });
+
+    res.json({ token, user: admin, expiresIn });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/auth/me", requireAdmin, async (req, res) => {
+  res.json({
+    user: {
+      id: Number(req.admin.sub),
+      name: req.admin.name,
+      email: req.admin.email,
+      role: req.admin.role,
+      active: true,
+      createdAt: "",
+    },
+  });
+});
+
+app.post("/api/services", requireAdmin, async (req, res, next) => {
   try {
     const service = normalizeService(req.body);
     requireServiceFields(service);
 
-    await apiPool.query(
+    const [result] = await apiPool.query(
       `INSERT INTO services (code, emoji, name_ta, name_si, name_en)
-       VALUES (?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         emoji = VALUES(emoji),
+         name_ta = VALUES(name_ta),
+         name_si = VALUES(name_si),
+         name_en = VALUES(name_en),
+         active = 1`,
       [service.code, service.emoji, service.ta, service.si, service.en],
     );
 
-    res.status(201).json(service);
+    res.status(result.insertId ? 201 : 200).json(service);
   } catch (error) {
     if (error?.code === "ER_DUP_ENTRY") {
       error.status = 409;
@@ -141,7 +224,7 @@ app.post("/api/services", async (req, res, next) => {
   }
 });
 
-app.put("/api/services/:code", async (req, res, next) => {
+app.put("/api/services/:code", requireAdmin, async (req, res, next) => {
   try {
     const currentCode = String(req.params.code || "").trim().toUpperCase();
     const service = normalizeService(req.body);
@@ -169,6 +252,27 @@ app.put("/api/services/:code", async (req, res, next) => {
   }
 });
 
+app.delete("/api/services/:code", requireAdmin, async (req, res, next) => {
+  try {
+    const code = String(req.params.code || "").trim().toUpperCase();
+    const [result] = await apiPool.query(
+      `UPDATE services
+       SET active = 0
+       WHERE code = ?`,
+      [code],
+    );
+
+    if (result.affectedRows === 0) {
+      res.status(404).json({ error: "Service was not found." });
+      return;
+    }
+
+    res.json({ code, active: false });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post("/api/tokens", async (req, res, next) => {
   const incomingService = normalizeService(req.body.service || {});
   const serviceCode = String(req.body.serviceCode || incomingService.code || "").trim().toUpperCase();
@@ -184,12 +288,18 @@ app.post("/api/tokens", async (req, res, next) => {
     await connection.beginTransaction();
 
     const [serviceRows] = await connection.query(
-      `SELECT code, emoji, name_ta, name_si, name_en
+      `SELECT code, emoji, name_ta, name_si, name_en, active
        FROM services
        WHERE code = ?
        FOR UPDATE`,
       [serviceCode],
     );
+
+    if (serviceRows[0] && Number(serviceRows[0].active) !== 1) {
+      const error = new Error("Service is unavailable.");
+      error.status = 404;
+      throw error;
+    }
 
     let service = serviceRows[0] ? toService(serviceRows[0]) : null;
 
@@ -267,6 +377,27 @@ app.get("/api/tokens/usage/by-year", async (_req, res, next) => {
   }
 });
 
+app.get("/api/tokens/counters", async (_req, res, next) => {
+  try {
+    const [rows] = await apiPool.query(
+      `SELECT s.code, COALESCE(c.counter, 0) AS counter
+       FROM services s
+       LEFT JOIN token_counters c ON c.service_code = s.code
+       WHERE s.active = 1
+       ORDER BY s.code`,
+    );
+
+    const counters = {};
+    for (const row of rows) {
+      counters[row.code] = Number(row.counter || 0);
+    }
+
+    res.json(counters);
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post("/api/feedback", async (req, res, next) => {
   try {
     const rating = Number(req.body.rating);
@@ -290,7 +421,7 @@ app.post("/api/feedback", async (req, res, next) => {
   }
 });
 
-app.get("/api/feedback/recent", async (req, res, next) => {
+app.get("/api/feedback/recent", requireAdmin, async (req, res, next) => {
   try {
     const requestedLimit = Number(req.query.limit || 8);
     const limit = Number.isInteger(requestedLimit)
@@ -310,7 +441,7 @@ app.get("/api/feedback/recent", async (req, res, next) => {
   }
 });
 
-app.get("/api/feedback/summary", async (_req, res, next) => {
+app.get("/api/feedback/summary", requireAdmin, async (_req, res, next) => {
   try {
     const [[totals]] = await apiPool.query(
       `SELECT
@@ -366,7 +497,7 @@ app.get("/api/feedback/summary", async (_req, res, next) => {
   }
 });
 
-app.get("/api/analytics/overview", async (_req, res, next) => {
+app.get("/api/analytics/overview", requireAdmin, async (_req, res, next) => {
   try {
     const [[totals]] = await apiPool.query(
       `SELECT
@@ -443,7 +574,7 @@ app.get("/api/analytics/overview", async (_req, res, next) => {
   }
 });
 
-app.get("/api/reports/feedback", async (_req, res, next) => {
+app.get("/api/reports/feedback", requireAdmin, async (_req, res, next) => {
   try {
     const [rows] = await apiPool.query(
       `SELECT id, rating, comment, mobile, created_at
@@ -456,7 +587,7 @@ app.get("/api/reports/feedback", async (_req, res, next) => {
   }
 });
 
-app.get("/api/reports/tokens", async (_req, res, next) => {
+app.get("/api/reports/tokens", requireAdmin, async (_req, res, next) => {
   try {
     const [rows] = await apiPool.query(
       `SELECT id, token_number, service_code, service_name, issued_year, issued_at
@@ -478,7 +609,7 @@ app.get("/api/reports/tokens", async (_req, res, next) => {
   }
 });
 
-app.get("/api/reports/:type/export", async (req, res, next) => {
+app.get("/api/reports/:type/export", requireAdmin, async (req, res, next) => {
   try {
     if (req.params.type === "feedback") {
       const [rows] = await apiPool.query(
@@ -535,7 +666,7 @@ app.get("/api/reports/:type/export", async (req, res, next) => {
   }
 });
 
-app.get("/api/settings", async (_req, res, next) => {
+app.get("/api/settings", requireAdmin, async (_req, res, next) => {
   try {
     const [rows] = await apiPool.query(
       `SELECT setting_key, setting_value
@@ -552,7 +683,7 @@ app.get("/api/settings", async (_req, res, next) => {
   }
 });
 
-app.put("/api/settings", async (req, res, next) => {
+app.put("/api/settings", requireAdmin, async (req, res, next) => {
   try {
     const allowed = ["organizationName", "kioskTitle", "supportPhone", "reportEmail"];
     const settings = {};
@@ -576,7 +707,7 @@ app.put("/api/settings", async (req, res, next) => {
   }
 });
 
-app.get("/api/users", async (_req, res, next) => {
+app.get("/api/users", requireAdmin, async (_req, res, next) => {
   try {
     const [rows] = await apiPool.query(
       `SELECT id, name, email, role, active, created_at
@@ -589,21 +720,27 @@ app.get("/api/users", async (_req, res, next) => {
   }
 });
 
-app.post("/api/users", async (req, res, next) => {
+app.post("/api/users", requireAdmin, async (req, res, next) => {
   try {
     const name = String(req.body.name || "").trim();
     const email = String(req.body.email || "").trim().toLowerCase();
     const role = String(req.body.role || "Staff").trim() || "Staff";
+    const password = String(req.body.password || "");
 
-    if (!name || !email) {
-      res.status(400).json({ error: "Name and email are required." });
+    if (!name || !email || !password) {
+      res.status(400).json({ error: "Name, email, and password are required." });
+      return;
+    }
+    if (password.length < 8) {
+      res.status(400).json({ error: "Password must be at least 8 characters." });
       return;
     }
 
+    const passwordHash = await hashPassword(password);
     const [result] = await apiPool.query(
-      `INSERT INTO admin_users (name, email, role)
-       VALUES (?, ?, ?)`,
-      [name, email, role],
+      `INSERT INTO admin_users (name, email, role, password_hash)
+       VALUES (?, ?, ?, ?)`,
+      [name, email, role, passwordHash],
     );
 
     res.status(201).json({
@@ -623,7 +760,7 @@ app.post("/api/users", async (req, res, next) => {
   }
 });
 
-app.patch("/api/users/:id", async (req, res, next) => {
+app.patch("/api/users/:id", requireAdmin, async (req, res, next) => {
   try {
     const id = Number(req.params.id);
     const active = Boolean(req.body.active);

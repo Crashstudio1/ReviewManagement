@@ -16,6 +16,8 @@ test("Admin dashboard sidebar has a close control and mobile closed state", asyn
   assert.match(source, /setSidebarOpen\(false\)/);
   assert.match(source, /-translate-x-full lg:translate-x-0/);
   assert.match(source, /onEditService/);
+  assert.match(source, /onDeleteService/);
+  assert.match(source, /Delete/);
   assert.match(source, /Save Changes/);
   assert.match(source, /Cancel Edit/);
   assert.match(source, /api\.getRecentFeedback/);
@@ -27,4 +29,5 @@ test("Admin dashboard sidebar has a close control and mobile closed state", asyn
   assert.match(source, /Export Excel/);
   assert.match(source, /SettingsAdminPanel/);
   assert.match(source, /UsersAdminPanel/);
+  assert.match(source, /Temporary password/);
 });

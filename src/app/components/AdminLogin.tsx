@@ -1,42 +1,34 @@
 import { useState } from "react";
 import { Eye, EyeOff, ShieldCheck, AlertCircle, Lock, User } from "lucide-react";
+import { api, type AuthUser } from "../api";
 import { DevelopingPartner } from "./DevelopingPartner";
 import { GovernmentLogo } from "./GovernmentLogo";
 
 interface Props {
-  onLogin: () => void;
+  onLogin: (user: AuthUser) => void;
   onBack: () => void;
 }
 
-const DEMO_CREDENTIALS = [
-  { username: "admin", password: "admin123", role: "Super Admin", badge: "SA" },
-  { username: "officer", password: "officer123", role: "Review Officer", badge: "RO" },
-];
-
 export function AdminLogin({ onLogin, onBack }: Props) {
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [focused, setFocused] = useState<"user" | "pass" | null>(null);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setLoading(true);
 
-    setTimeout(() => {
-      const match = DEMO_CREDENTIALS.find(
-        (c) => c.username === username.trim() && c.password === password
-      );
-      if (match) {
-        onLogin();
-      } else {
-        setError("Invalid username or password. Please try again.");
-        setLoading(false);
-      }
-    }, 900);
+    try {
+      const result = await api.login(email, password);
+      onLogin(result.user);
+    } catch (loginError) {
+      setError(loginError instanceof Error ? loginError.message : "Invalid email or password. Please try again.");
+      setLoading(false);
+    }
   }
 
   return (
@@ -127,14 +119,14 @@ export function AdminLogin({ onLogin, onBack }: Props) {
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Username */}
+              {/* Email */}
               <div>
                 <label
-                  htmlFor="username"
+                  htmlFor="email"
                   className="block mb-2 text-sm font-semibold"
                   style={{ color: "var(--foreground)" }}
                 >
-                  Username
+                  Email
                 </label>
                 <div
                   className="flex items-center rounded-2xl overflow-hidden transition-all duration-150"
@@ -148,14 +140,14 @@ export function AdminLogin({ onLogin, onBack }: Props) {
                     <User size={18} />
                   </div>
                   <input
-                    id="username"
-                    type="text"
+                    id="email"
+                    type="email"
                     autoComplete="username"
-                    value={username}
-                    onChange={(e) => { setUsername(e.target.value); setError(""); }}
+                    value={email}
+                    onChange={(e) => { setEmail(e.target.value); setError(""); }}
                     onFocus={() => setFocused("user")}
                     onBlur={() => setFocused(null)}
-                    placeholder="Enter your username"
+                    placeholder="Enter your email"
                     className="flex-1 py-4 pr-4 bg-transparent focus:outline-none text-sm"
                     style={{ color: "var(--foreground)" }}
                     required
@@ -224,7 +216,7 @@ export function AdminLogin({ onLogin, onBack }: Props) {
               {/* Submit */}
               <button
                 type="submit"
-                disabled={loading || !username || !password}
+                disabled={loading || !email || !password}
                 className="w-full py-4 rounded-2xl text-white font-semibold text-base shadow-lg transition-all duration-150 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
                 style={{
                   background: "linear-gradient(135deg, #3D0010 0%, #800020 60%, #B03A48 100%)",
@@ -246,47 +238,6 @@ export function AdminLogin({ onLogin, onBack }: Props) {
                   </>
                 )}
               </button>
-
-              {/* Divider */}
-              <div className="flex items-center gap-3 my-2">
-                <div className="flex-1 h-px" style={{ background: "var(--border)" }} />
-                <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>Demo Credentials</span>
-                <div className="flex-1 h-px" style={{ background: "var(--border)" }} />
-              </div>
-
-              {/* Demo credential chips */}
-              <div className="grid grid-cols-2 gap-3">
-                {DEMO_CREDENTIALS.map((c) => (
-                  <button
-                    key={c.username}
-                    type="button"
-                    onClick={() => { setUsername(c.username); setPassword(c.password); setError(""); }}
-                    className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition-all duration-100 text-left"
-                    style={{ background: "#fff", borderColor: "var(--border)" }}
-                    onMouseEnter={(e) => {
-                      const el = e.currentTarget as HTMLButtonElement;
-                      el.style.borderColor = "var(--gov-maroon)";
-                      el.style.background = "#FFF8F8";
-                    }}
-                    onMouseLeave={(e) => {
-                      const el = e.currentTarget as HTMLButtonElement;
-                      el.style.borderColor = "var(--border)";
-                      el.style.background = "#fff";
-                    }}
-                  >
-                    <div
-                      className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0"
-                      style={{ background: "var(--gov-maroon)", color: "#fff" }}
-                    >
-                      {c.badge}
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold" style={{ color: "var(--foreground)" }}>{c.username}</p>
-                      <p className="text-xs" style={{ color: "var(--muted-foreground)", fontSize: "0.65rem" }}>{c.role}</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
             </form>
 
             {/* Back to kiosk */}

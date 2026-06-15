@@ -7,7 +7,7 @@ import { ThankYouScreen } from "./components/ThankYouScreen";
 import { AdminLogin } from "./components/AdminLogin";
 import { AdminDashboard } from "./components/AdminDashboard";
 import { AnalyticsPage } from "./components/AnalyticsPage";
-import { api, type TokenUsageByYear } from "./api";
+import { api, type AuthUser, type TokenUsageByYear } from "./api";
 
 /* MARKER-MAKE-KIT-INVOKED */
 
@@ -59,6 +59,7 @@ export default function App() {
   const [tokenUsageByYear, setTokenUsageByYear] = useState<TokenUsageByYear>(loadTokenUsage);
   const [generatedToken, setGeneratedToken] = useState<GeneratedToken | null>(null);
   const [submittedRating, setSubmittedRating] = useState(5);
+  const [adminUser, setAdminUser] = useState<AuthUser | null>(() => api.getStoredAdmin());
   // Track logo tap count for hidden admin entry
   const [logoTaps, setLogoTaps] = useState(0);
 
@@ -95,6 +96,27 @@ export default function App() {
         // Keep local yearly usage when the API is not available.
       });
 
+    api.getTokenCounters()
+      .then((counters) => {
+        if (!cancelled) {
+          setTokenCounters(counters);
+        }
+      })
+      .catch(() => {
+        // Keep local counters when the API is not available.
+      });
+
+    if (api.getAuthToken()) {
+      api.getCurrentAdmin()
+        .then((user) => {
+          if (!cancelled) setAdminUser(user);
+        })
+        .catch(() => {
+          api.logout();
+          if (!cancelled) setAdminUser(null);
+        });
+    }
+
     return () => {
       cancelled = true;
     };
@@ -130,6 +152,9 @@ export default function App() {
         serviceEmoji: issued.service.emoji,
       });
       setScreen("token-generated");
+      api.getTokenCounters()
+        .then(setTokenCounters)
+        .catch(() => {});
       return;
     } catch {
       // Fall back to local token issuing when the MySQL API is unavailable.
@@ -203,6 +228,32 @@ export default function App() {
     }
 
     return saved;
+  }
+
+  async function handleDeleteService(code: string) {
+    const normalizedCode = code.trim().toUpperCase();
+    try {
+      await api.deleteService(normalizedCode);
+    } catch {
+      // Keep local service deletion available in offline/demo mode.
+    }
+
+    setServices((prev) => prev.filter((item) => item.code.trim().toUpperCase() !== normalizedCode));
+    setTokenCounters((prev) => {
+      const { [normalizedCode]: _removed, ...rest } = prev;
+      return rest;
+    });
+  }
+
+  function handleAdminLogin(user: AuthUser) {
+    setAdminUser(user);
+    setScreen("admin-dashboard");
+  }
+
+  function handleAdminLogout() {
+    api.logout();
+    setAdminUser(null);
+    setScreen("admin-login");
   }
 
   // Secret admin entry: tap the footer 5 times on the home screen
@@ -296,24 +347,41 @@ export default function App() {
 
       {screen === "admin-login" && (
         <AdminLogin
-          onLogin={() => setScreen("admin-dashboard")}
+          onLogin={handleAdminLogin}
           onBack={goHome}
         />
       )}
 
-      {screen === "admin-dashboard" && (
+      {screen === "admin-dashboard" && adminUser && (
         <AdminDashboard
           onNavigate={(p) => setScreen(p as Screen)}
+          onLogout={handleAdminLogout}
+          adminUser={adminUser}
           services={services}
           onAddService={handleAddService}
           onUpdateService={handleUpdateService}
+          onDeleteService={handleDeleteService}
           tokenUsageByYear={tokenUsageByYear}
         />
       )}
 
-      {screen === "analytics" && (
+      {screen === "admin-dashboard" && !adminUser && (
+        <AdminLogin
+          onLogin={handleAdminLogin}
+          onBack={goHome}
+        />
+      )}
+
+      {screen === "analytics" && adminUser && (
         <AnalyticsPage
           onBack={() => setScreen("admin-dashboard")}
+        />
+      )}
+
+      {screen === "analytics" && !adminUser && (
+        <AdminLogin
+          onLogin={handleAdminLogin}
+          onBack={goHome}
         />
       )}
     </div>

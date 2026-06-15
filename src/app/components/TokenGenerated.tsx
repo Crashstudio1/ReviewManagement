@@ -27,13 +27,23 @@ export function TokenGenerated({ token, serviceName, serviceEmoji, onHome }: Pro
   const [countdown, setCountdown] = useState(8);
   const [printing, setPrinting] = useState(true);
   const [printed, setPrinted] = useState(false);
+  const [issuedAt] = useState(() => new Date());
+
+  const printedDate = issuedAt.toLocaleDateString("en-GB");
+  const printedTime = issuedAt.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 
   useEffect(() => {
+    const browserPrintTimer = setTimeout(() => {
+      window.print();
+    }, 450);
     const printTimer = setTimeout(() => {
       setPrinting(false);
       setPrinted(true);
     }, 2200);
-    return () => clearTimeout(printTimer);
+    return () => {
+      clearTimeout(browserPrintTimer);
+      clearTimeout(printTimer);
+    };
   }, []);
 
   useEffect(() => {
@@ -151,7 +161,7 @@ export function TokenGenerated({ token, serviceName, serviceEmoji, onHome }: Pro
                   Date
                 </p>
                 <p className="text-sm font-semibold" style={{ color: "var(--foreground)", fontFamily: "'Inter', sans-serif" }}>
-                  {new Date().toLocaleDateString("en-GB")}
+                  {printedDate}
                 </p>
               </div>
               <div className="w-px" style={{ background: "var(--border)" }} />
@@ -160,7 +170,7 @@ export function TokenGenerated({ token, serviceName, serviceEmoji, onHome }: Pro
                   Time
                 </p>
                 <p className="text-sm font-semibold" style={{ color: "var(--foreground)", fontFamily: "'Inter', sans-serif" }}>
-                  {new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                  {printedTime}
                 </p>
               </div>
               <div className="w-px" style={{ background: "var(--border)" }} />
@@ -250,6 +260,18 @@ export function TokenGenerated({ token, serviceName, serviceEmoji, onHome }: Pro
         </button>
       </div>
 
+      <div className="print-ticket" aria-hidden="true">
+        <div className="ticket-center ticket-title">Vavuniya South Tamil Pradeshiya Sabha</div>
+        <div className="ticket-center ticket-subtitle">Queue Token</div>
+        <div className="ticket-rule" />
+        <div className="ticket-center ticket-service">{serviceEmoji} {serviceName}</div>
+        <div className="ticket-center ticket-token">{token}</div>
+        <div className="ticket-row"><span>Date</span><strong>{printedDate}</strong></div>
+        <div className="ticket-row"><span>Time</span><strong>{printedTime}</strong></div>
+        <div className="ticket-rule" />
+        <div className="ticket-center ticket-note">Please wait until your token number is called.</div>
+      </div>
+
       <style>{`
         @keyframes ping {
           0% { transform: scale(1); opacity: 0.3; }
@@ -258,6 +280,45 @@ export function TokenGenerated({ token, serviceName, serviceEmoji, onHome }: Pro
         @keyframes bounce {
           0%, 100% { transform: translateY(0); }
           50% { transform: translateY(-5px); }
+        }
+        .print-ticket {
+          position: fixed;
+          top: 0;
+          left: -10000px;
+          width: 72mm;
+          padding: 0;
+          background: #fff;
+          color: #000;
+          font-family: Arial, Helvetica, sans-serif;
+          font-size: 11px;
+          line-height: 1.35;
+        }
+        .ticket-center { text-align: center; }
+        .ticket-title { font-size: 13px; font-weight: 700; }
+        .ticket-subtitle { margin-top: 2px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+        .ticket-rule { margin: 7px 0; border-top: 1px dashed #000; }
+        .ticket-service { font-size: 12px; font-weight: 700; }
+        .ticket-token { margin: 8px 0; font-size: 38px; font-weight: 900; letter-spacing: 2px; }
+        .ticket-row { display: flex; justify-content: space-between; gap: 8px; margin: 3px 0; }
+        .ticket-note { font-size: 10px; }
+        @media print {
+          @page {
+            size: 80mm auto;
+            margin: 4mm;
+          }
+          body * {
+            visibility: hidden !important;
+          }
+          .print-ticket,
+          .print-ticket * {
+            visibility: visible !important;
+          }
+          .print-ticket {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 72mm;
+          }
         }
       `}</style>
     </div>

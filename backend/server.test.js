@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { test } from "node:test";
+import { hashPassword, signJwt } from "./auth.js";
 import { createApp } from "./server.js";
 
 async function withServer(app, run) {
@@ -17,6 +18,18 @@ async function withServer(app, run) {
       server.close((error) => (error ? reject(error) : resolve()));
     });
   }
+}
+
+function adminHeaders(headers = {}) {
+  return {
+    Authorization: `Bearer ${signJwt({
+      sub: 1,
+      name: "Admin",
+      email: "admin@example.com",
+      role: "Administrator",
+    })}`,
+    ...headers,
+  };
 }
 
 test("GET /api/health confirms database connectivity", async () => {
@@ -70,6 +83,61 @@ test("GET /api/services maps database rows to kiosk services", async () => {
   });
 });
 
+test("POST /api/auth/login returns a JWT for valid admin credentials", async () => {
+  const passwordHash = await hashPassword("Secret123");
+  const calls = [];
+  const app = createApp({
+    async query(sql, params) {
+      calls.push({ sql, params });
+      if (sql.includes("FROM admin_users")) {
+        return [[{
+          id: 1,
+          name: "Admin",
+          email: "admin@example.com",
+          role: "Administrator",
+          active: 1,
+          password_hash: passwordHash,
+          created_at: new Date("2026-06-14T10:30:00.000Z"),
+        }]];
+      }
+      return [{ affectedRows: 1 }];
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "ADMIN@EXAMPLE.COM", password: "Secret123" }),
+    });
+
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(typeof body.token, "string");
+    assert.equal(body.user.email, "admin@example.com");
+    assert.equal(body.user.role, "Administrator");
+  });
+
+  assert.match(calls[0].sql, /FROM admin_users/);
+  assert.deepEqual(calls[0].params, ["admin@example.com"]);
+  assert.match(calls[1].sql, /last_login_at/);
+});
+
+test("admin routes require a valid JWT", async () => {
+  const app = createApp({
+    async query() {
+      throw new Error("query should not be called without auth");
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/settings`);
+
+    assert.equal(response.status, 401);
+    assert.deepEqual(await response.json(), { error: "Admin login is required." });
+  });
+});
+
 test("POST /api/services validates required service fields", async () => {
   const app = createApp({
     async query() {
@@ -80,7 +148,7 @@ test("POST /api/services validates required service fields", async () => {
   await withServer(app, async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/services`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: adminHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ code: "X" }),
     });
 
@@ -103,7 +171,7 @@ test("POST /api/services reports duplicate service codes", async () => {
   await withServer(app, async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/services`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: adminHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         code: "A",
         emoji: "B",
@@ -132,7 +200,7 @@ test("PUT /api/services/:code updates an existing service", async () => {
   await withServer(app, async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/services/A`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: adminHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         code: "B",
         emoji: "C",
@@ -173,7 +241,7 @@ test("PUT /api/services/:code reports missing services", async () => {
   await withServer(app, async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/services/MISSING`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: adminHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         code: "M",
         emoji: "N",
@@ -202,7 +270,7 @@ test("PUT /api/services/:code reports duplicate service codes", async () => {
   await withServer(app, async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/services/A`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: adminHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         code: "B",
         emoji: "C",
@@ -234,6 +302,7 @@ test("POST /api/tokens issues the next token inside a transaction", async () => 
           name_ta: "Tamil",
           name_si: "Sinhala",
           name_en: "English",
+          active: 1,
         }]];
       }
       if (sql.includes("FROM token_counters")) {
@@ -282,6 +351,49 @@ test("POST /api/tokens issues the next token inside a transaction", async () => 
   assert.equal(connection.released, true);
   assert.equal(queries.at(-2).params[0], 8);
   assert.equal(queries.at(-1).params[0], "A008");
+});
+
+test("GET /api/tokens/counters returns current counters for active services", async () => {
+  const app = createApp({
+    async query(sql) {
+      assert.match(sql, /LEFT JOIN token_counters/);
+      assert.match(sql, /s\.active = 1/);
+      return [[
+        { code: "A", counter: 8 },
+        { code: "B", counter: 0 },
+      ]];
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/tokens/counters`);
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { A: 8, B: 0 });
+  });
+});
+
+test("DELETE /api/services/:code soft deletes services for the kiosk", async () => {
+  const calls = [];
+  const app = createApp({
+    async query(sql, params) {
+      calls.push({ sql, params });
+      return [{ affectedRows: 1 }];
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/services/A`, {
+      method: "DELETE",
+      headers: adminHeaders(),
+    });
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { code: "A", active: false });
+  });
+
+  assert.match(calls[0].sql, /SET active = 0/);
+  assert.deepEqual(calls[0].params, ["A"]);
 });
 
 test("POST /api/feedback validates rating range", async () => {
@@ -350,7 +462,9 @@ test("GET /api/feedback/recent returns live reviews with contact numbers", async
   });
 
   await withServer(app, async (baseUrl) => {
-    const response = await fetch(`${baseUrl}/api/feedback/recent`);
+    const response = await fetch(`${baseUrl}/api/feedback/recent`, {
+      headers: adminHeaders(),
+    });
 
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), [{
@@ -396,7 +510,9 @@ test("GET /api/feedback/summary returns real dashboard aggregates", async () => 
   });
 
   await withServer(app, async (baseUrl) => {
-    const response = await fetch(`${baseUrl}/api/feedback/summary`);
+    const response = await fetch(`${baseUrl}/api/feedback/summary`, {
+      headers: adminHeaders(),
+    });
 
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), {
@@ -444,7 +560,9 @@ test("GET /api/analytics/overview returns live analytics aggregates", async () =
   });
 
   await withServer(app, async (baseUrl) => {
-    const response = await fetch(`${baseUrl}/api/analytics/overview`);
+    const response = await fetch(`${baseUrl}/api/analytics/overview`, {
+      headers: adminHeaders(),
+    });
 
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), {
@@ -482,7 +600,9 @@ test("GET /api/reports/tokens returns issued token rows", async () => {
   });
 
   await withServer(app, async (baseUrl) => {
-    const response = await fetch(`${baseUrl}/api/reports/tokens`);
+    const response = await fetch(`${baseUrl}/api/reports/tokens`, {
+      headers: adminHeaders(),
+    });
 
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), [{
@@ -508,7 +628,9 @@ test("GET /api/settings returns admin settings object", async () => {
   });
 
   await withServer(app, async (baseUrl) => {
-    const response = await fetch(`${baseUrl}/api/settings`);
+    const response = await fetch(`${baseUrl}/api/settings`, {
+      headers: adminHeaders(),
+    });
 
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), {
@@ -530,8 +652,13 @@ test("POST /api/users creates admin users", async () => {
   await withServer(app, async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/users`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "Jane Admin", email: "JANE@EXAMPLE.COM", role: "Supervisor" }),
+      headers: adminHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({
+        name: "Jane Admin",
+        email: "JANE@EXAMPLE.COM",
+        role: "Supervisor",
+        password: "Secret123",
+      }),
     });
 
     assert.equal(response.status, 201);
@@ -544,5 +671,8 @@ test("POST /api/users creates admin users", async () => {
   });
 
   assert.match(calls[0].sql, /INSERT INTO admin_users/);
-  assert.deepEqual(calls[0].params, ["Jane Admin", "jane@example.com", "Supervisor"]);
+  assert.equal(calls[0].params[0], "Jane Admin");
+  assert.equal(calls[0].params[1], "jane@example.com");
+  assert.equal(calls[0].params[2], "Supervisor");
+  assert.match(calls[0].params[3], /^scrypt\$/);
 });

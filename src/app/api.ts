@@ -57,15 +57,56 @@ export interface AdminUser {
   createdAt: string;
 }
 
+export interface AuthUser extends AdminUser {}
+
+export interface LoginResult {
+  token: string;
+  user: AuthUser;
+  expiresIn: number;
+}
+
 const API_BASE_URL =
   (import.meta.env.VITE_API_BASE_URL || "/api")
   .replace(/\/$/, "");
+const AUTH_TOKEN_KEY = "gov-citizen-review-admin-token";
+const AUTH_USER_KEY = "gov-citizen-review-admin-user";
+
+let authToken = typeof window === "undefined"
+  ? ""
+  : window.localStorage.getItem(AUTH_TOKEN_KEY) || "";
+
+function getStoredUser(): AuthUser | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const saved = window.localStorage.getItem(AUTH_USER_KEY);
+    return saved ? JSON.parse(saved) as AuthUser : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveAuth(token: string, user: AuthUser) {
+  authToken = token;
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(AUTH_TOKEN_KEY, token);
+    window.localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+  }
+}
+
+function clearAuth() {
+  authToken = "";
+  if (typeof window !== "undefined") {
+    window.localStorage.removeItem(AUTH_TOKEN_KEY);
+    window.localStorage.removeItem(AUTH_USER_KEY);
+  }
+}
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
       ...(options.headers || {}),
     },
   });
@@ -85,6 +126,33 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
+  getAuthToken() {
+    return authToken;
+  },
+
+  getStoredAdmin() {
+    return getStoredUser();
+  },
+
+  logout() {
+    clearAuth();
+  },
+
+  async login(email: string, password: string) {
+    const result = await request<LoginResult>("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    });
+    saveAuth(result.token, result.user);
+    return result;
+  },
+
+  async getCurrentAdmin() {
+    const result = await request<{ user: AuthUser }>("/auth/me");
+    if (authToken) saveAuth(authToken, result.user);
+    return result.user;
+  },
+
   getServices() {
     return request<Service[]>("/services");
   },
@@ -103,6 +171,12 @@ export const api = {
     });
   },
 
+  deleteService(code: string) {
+    return request<{ code: string; active: boolean }>(`/services/${encodeURIComponent(code)}`, {
+      method: "DELETE",
+    });
+  },
+
   issueToken(service: Service) {
     return request<{ token: string; service: Service; issuedYear: number }>("/tokens", {
       method: "POST",
@@ -112,6 +186,10 @@ export const api = {
 
   getTokenUsageByYear() {
     return request<TokenUsageByYear>("/tokens/usage/by-year");
+  },
+
+  getTokenCounters() {
+    return request<Record<string, number>>("/tokens/counters");
   },
 
   getRecentFeedback(limit = 8) {
@@ -149,7 +227,7 @@ export const api = {
     return request<AdminUser[]>("/users");
   },
 
-  addUser(user: Pick<AdminUser, "name" | "email" | "role">) {
+  addUser(user: Pick<AdminUser, "name" | "email" | "role"> & { password: string }) {
     return request<AdminUser>("/users", {
       method: "POST",
       body: JSON.stringify(user),
