@@ -607,6 +607,8 @@ function ReportsAdminPanel({
               onClick={() => downloadCsv("feedback-report.csv", feedbackReport as unknown as Array<Record<string, unknown>>, [
                 { key: "id", label: "ID" },
                 { key: "date", label: "Date & Time" },
+                { key: "serviceCode", label: "Service Code" },
+                { key: "serviceName", label: "Service Name" },
                 { key: "rating", label: "Rating" },
                 { key: "comment", label: "Comment" },
                 { key: "mobile", label: "Contact Number" },
@@ -623,7 +625,7 @@ function ReportsAdminPanel({
             <table className="w-full">
               <thead>
                 <tr style={{ background: "var(--gov-cream)" }}>
-                  {["Date", "Rating", "Contact", "Status"].map((header) => (
+                  {["Date", "Service", "Rating", "Contact", "Status"].map((header) => (
                     <th key={header} className="px-4 py-3 text-left text-xs font-semibold uppercase" style={{ color: "var(--muted-foreground)" }}>
                       {header}
                     </th>
@@ -634,6 +636,9 @@ function ReportsAdminPanel({
                 {feedbackReport.slice(0, 8).map((row) => (
                   <tr key={row.id} className="border-t" style={{ borderColor: "var(--border)" }}>
                     <td className="px-4 py-3 text-xs" style={{ color: "var(--muted-foreground)" }}>{row.date}</td>
+                    <td className="px-4 py-3 text-sm" style={{ color: "var(--foreground)" }}>
+                      {row.serviceName || "Unassigned"}
+                    </td>
                     <td className="px-4 py-3"><StarRating rating={row.rating} /></td>
                     <td className="px-4 py-3 text-sm" style={{ color: "var(--foreground)" }}>{row.mobile}</td>
                     <td className="px-4 py-3"><StatusBadge status={row.status} /></td>
@@ -641,7 +646,7 @@ function ReportsAdminPanel({
                 ))}
                 {feedbackReport.length === 0 && (
                   <tr className="border-t" style={{ borderColor: "var(--border)" }}>
-                    <td colSpan={4} className="px-4 py-8 text-center text-sm" style={{ color: "var(--muted-foreground)" }}>
+                    <td colSpan={5} className="px-4 py-8 text-center text-sm" style={{ color: "var(--muted-foreground)" }}>
                       No feedback records yet.
                     </td>
                   </tr>
@@ -1464,7 +1469,7 @@ export function AdminDashboard({
               <table className="w-full">
                 <thead>
                   <tr style={{ background: "var(--gov-cream)" }}>
-                    {["Date & Time", "Rating", "Comment", "Mobile", "Status"].map((h) => (
+                    {["Date & Time", "Service", "Rating", "Comment", "Mobile", "Status"].map((h) => (
                       <th
                         key={h}
                         className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wide"
@@ -1479,7 +1484,7 @@ export function AdminDashboard({
                   {recentReviews.length === 0 && (
                     <tr className="border-t" style={{ borderColor: "var(--border)" }}>
                       <td
-                        colSpan={5}
+                        colSpan={6}
                         className="px-5 py-8 text-center text-sm"
                         style={{ color: "var(--muted-foreground)" }}
                       >
@@ -1495,6 +1500,9 @@ export function AdminDashboard({
                     >
                       <td className="px-5 py-3.5 text-xs" style={{ color: "var(--muted-foreground)", whiteSpace: "nowrap" }}>
                         {r.date}
+                      </td>
+                      <td className="px-5 py-3.5 text-sm" style={{ color: "var(--foreground)" }}>
+                        {r.serviceName || "Unassigned"}
                       </td>
                       <td className="px-5 py-3.5">
                         <StarRating rating={r.rating} />

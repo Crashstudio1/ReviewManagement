@@ -63,6 +63,8 @@ function toFeedbackReview(row) {
     rating,
     comment: row.comment || "",
     mobile: displayMobile(String(row.mobile || "").trim()),
+    serviceCode: row.service_code || "",
+    serviceName: row.service_name || "",
     status: getFeedbackStatus(rating),
   };
 }
@@ -403,19 +405,45 @@ app.post("/api/feedback", async (req, res, next) => {
     const rating = Number(req.body.rating);
     const comment = String(req.body.comment || "").trim();
     const mobile = String(req.body.mobile || "").trim();
+    const serviceCode = String(req.body.serviceCode || "").trim().toUpperCase();
+    const fallbackServiceName = String(req.body.serviceName || "").trim();
 
     if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
       res.status(400).json({ error: "Rating must be between 1 and 5." });
       return;
     }
 
+    let feedbackServiceCode = serviceCode || null;
+    let feedbackServiceName = fallbackServiceName || null;
+
+    if (serviceCode) {
+      const [serviceRows] = await apiPool.query(
+        `SELECT code, name_en
+         FROM services
+         WHERE code = ?
+         LIMIT 1`,
+        [serviceCode],
+      );
+      if (serviceRows[0]) {
+        feedbackServiceCode = serviceRows[0].code;
+        feedbackServiceName = serviceRows[0].name_en;
+      }
+    }
+
     const [result] = await apiPool.query(
-      `INSERT INTO feedback (rating, comment, mobile)
-       VALUES (?, ?, ?)`,
-      [rating, comment || null, mobile || null],
+      `INSERT INTO feedback (rating, comment, mobile, service_code, service_name)
+       VALUES (?, ?, ?, ?, ?)`,
+      [rating, comment || null, mobile || null, feedbackServiceCode, feedbackServiceName],
     );
 
-    res.status(201).json({ id: result.insertId, rating, comment, mobile });
+    res.status(201).json({
+      id: result.insertId,
+      rating,
+      comment,
+      mobile,
+      serviceCode: feedbackServiceCode || "",
+      serviceName: feedbackServiceName || "",
+    });
   } catch (error) {
     next(error);
   }
@@ -428,7 +456,7 @@ app.get("/api/feedback/recent", requireAdmin, async (req, res, next) => {
       ? Math.min(Math.max(requestedLimit, 1), 50)
       : 8;
     const [rows] = await apiPool.query(
-      `SELECT id, rating, comment, mobile, created_at
+      `SELECT id, rating, comment, mobile, service_code, service_name, created_at
        FROM feedback
        ORDER BY created_at DESC
        LIMIT ?`,
@@ -577,7 +605,7 @@ app.get("/api/analytics/overview", requireAdmin, async (_req, res, next) => {
 app.get("/api/reports/feedback", requireAdmin, async (_req, res, next) => {
   try {
     const [rows] = await apiPool.query(
-      `SELECT id, rating, comment, mobile, created_at
+      `SELECT id, rating, comment, mobile, service_code, service_name, created_at
        FROM feedback
        ORDER BY created_at DESC`,
     );
@@ -613,13 +641,15 @@ app.get("/api/reports/:type/export", requireAdmin, async (req, res, next) => {
   try {
     if (req.params.type === "feedback") {
       const [rows] = await apiPool.query(
-        `SELECT id, rating, comment, mobile, created_at
+        `SELECT id, rating, comment, mobile, service_code, service_name, created_at
          FROM feedback
          ORDER BY created_at DESC`,
       );
       const csv = toCsv(rows.map(toFeedbackReview), [
         { key: "id", label: "ID" },
         { key: "date", label: "Date & Time" },
+        { key: "serviceCode", label: "Service Code" },
+        { key: "serviceName", label: "Service Name" },
         { key: "rating", label: "Rating" },
         { key: "comment", label: "Comment" },
         { key: "mobile", label: "Contact Number" },

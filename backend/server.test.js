@@ -422,6 +422,9 @@ test("POST /api/feedback stores valid reviews", async () => {
   const app = createApp({
     async query(sql, params) {
       calls.push({ sql, params });
+      if (sql.includes("FROM services")) {
+        return [[{ code: "A", name_en: "Building Approval" }]];
+      }
       return [{ insertId: 42 }];
     },
   });
@@ -430,7 +433,7 @@ test("POST /api/feedback stores valid reviews", async () => {
     const response = await fetch(`${baseUrl}/api/feedback`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ rating: 4, comment: " Good ", mobile: "" }),
+      body: JSON.stringify({ rating: 4, comment: " Good ", mobile: "", serviceCode: "A" }),
     });
 
     assert.equal(response.status, 201);
@@ -439,11 +442,15 @@ test("POST /api/feedback stores valid reviews", async () => {
       rating: 4,
       comment: "Good",
       mobile: "",
+      serviceCode: "A",
+      serviceName: "Building Approval",
     });
   });
 
-  assert.match(calls[0].sql, /INSERT INTO feedback/);
-  assert.deepEqual(calls[0].params, [4, "Good", null]);
+  assert.match(calls[0].sql, /FROM services/);
+  assert.deepEqual(calls[0].params, ["A"]);
+  assert.match(calls[1].sql, /INSERT INTO feedback/);
+  assert.deepEqual(calls[1].params, [4, "Good", null, "A", "Building Approval"]);
 });
 
 test("GET /api/feedback/recent returns live reviews with contact numbers", async () => {
@@ -456,6 +463,8 @@ test("GET /api/feedback/recent returns live reviews with contact numbers", async
       rating: 5,
       comment: "Fast service",
       mobile: "0771234523",
+      service_code: "A",
+      service_name: "Building Approval",
         created_at: new Date("2026-06-14T09:15:00.000Z"),
       }]];
     },
@@ -473,6 +482,8 @@ test("GET /api/feedback/recent returns live reviews with contact numbers", async
       rating: 5,
       comment: "Fast service",
       mobile: "0771234523",
+      serviceCode: "A",
+      serviceName: "Building Approval",
       status: "Positive",
     }]);
   });

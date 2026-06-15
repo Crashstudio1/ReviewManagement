@@ -8,6 +8,8 @@ export interface FeedbackReview {
   rating: number;
   comment: string;
   mobile: string;
+  serviceCode: string;
+  serviceName: string;
   status: "Positive" | "Negative" | "Neutral";
 }
 
@@ -241,7 +243,7 @@ export const api = {
     });
   },
 
-  submitFeedback(payload: { rating: number; comment?: string; mobile?: string }) {
+  submitFeedback(payload: { rating: number; comment?: string; mobile?: string; serviceCode?: string; serviceName?: string }) {
     return request<{ id: number }>("/feedback", {
       method: "POST",
       body: JSON.stringify(payload),

@@ -23,6 +23,7 @@ type Screen =
 
 interface GeneratedToken {
   token: string;
+  serviceCode: string;
   serviceName: string;
   serviceEmoji: string;
 }
@@ -148,6 +149,7 @@ export default function App() {
       recordTokenUsage(String(issued.issuedYear), svc.code);
       setGeneratedToken({
         token: issued.token,
+        serviceCode: issued.service.code,
         serviceName: issued.service.en,
         serviceEmoji: issued.service.emoji,
       });
@@ -164,12 +166,12 @@ export default function App() {
     const token = `${svc.code}${String(next).padStart(3, "0")}`;
     setTokenCounters((prev) => ({ ...prev, [svc.code]: next }));
     recordTokenUsage(String(new Date().getFullYear()), svc.code);
-    setGeneratedToken({ token, serviceName: svc.en, serviceEmoji: svc.emoji });
+    setGeneratedToken({ token, serviceCode: svc.code, serviceName: svc.en, serviceEmoji: svc.emoji });
     setScreen("token-generated");
   }
 
-  function handleReviewSubmit(rating: number, comment = "", mobile = "") {
-    api.submitFeedback({ rating, comment, mobile }).catch(() => {
+  function handleReviewSubmit(rating: number, comment = "", mobile = "", serviceCode = "", serviceName = "") {
+    api.submitFeedback({ rating, comment, mobile, serviceCode, serviceName }).catch(() => {
       // Feedback still completes in offline/demo mode.
     });
     setSubmittedRating(rating);
@@ -335,6 +337,8 @@ export default function App() {
         <ReviewScreen
           onSubmit={handleReviewSubmit}
           onBack={goHome}
+          services={services}
+          initialServiceCode={generatedToken?.serviceCode || ""}
         />
       )}
 

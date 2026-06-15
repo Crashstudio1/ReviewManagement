@@ -44,9 +44,12 @@ const ddl = [
     rating TINYINT UNSIGNED NOT NULL,
     comment TEXT NULL,
     mobile VARCHAR(32) NULL,
+    service_code VARCHAR(8) NULL,
+    service_name VARCHAR(255) NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_feedback_created_at (created_at),
-    INDEX idx_feedback_rating (rating)
+    INDEX idx_feedback_rating (rating),
+    INDEX idx_feedback_service_code (service_code)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   `CREATE TABLE IF NOT EXISTS admin_settings (
     setting_key VARCHAR(64) PRIMARY KEY,
@@ -102,6 +105,21 @@ try {
     `ALTER TABLE admin_users
      ADD COLUMN last_login_at TIMESTAMP NULL AFTER active`,
   );
+  await addColumnIfMissing(
+    `ALTER TABLE feedback
+     ADD COLUMN service_code VARCHAR(8) NULL AFTER mobile`,
+  );
+  await addColumnIfMissing(
+    `ALTER TABLE feedback
+     ADD COLUMN service_name VARCHAR(255) NULL AFTER service_code`,
+  );
+  try {
+    await bootstrapPool.query(
+      `CREATE INDEX idx_feedback_service_code ON feedback (service_code)`,
+    );
+  } catch (error) {
+    if (error?.code !== "ER_DUP_KEYNAME") throw error;
+  }
   for (const service of defaultServices) {
     await bootstrapPool.query(
       `INSERT INTO services (code, emoji, name_ta, name_si, name_en)
