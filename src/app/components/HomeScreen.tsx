@@ -104,16 +104,30 @@ export function HomeScreen({ onGetToken, onGiveFeedback }: Props) {
               வவுனியா தெற்கு தமிழ் பிரதேச சபை
             </h1>
             <p
+              className="text-white/85 mt-1 leading-tight"
+              lang="si"
+              style={{
+                fontSize: "clamp(0.8rem, 2vw, 1rem)",
+                fontWeight: 600,
+                fontFamily: "'Noto Sans Sinhala', sans-serif",
+              }}
+            >
+              වවුනියාව දකුණු දෙමළ ප්‍රාදේශීය සභාව
+            </p>
+            <p
               className="text-white/75 mt-1"
               style={{ fontSize: "clamp(0.75rem, 2vw, 0.95rem)", fontFamily: "'Inter', sans-serif" }}
             >
               Vavuniya South Tamil Pradeshiya Sabha
             </p>
             <div
-              className="mt-2 inline-block px-3 py-0.5 rounded-full text-xs font-medium"
-              style={{ background: "rgba(212,175,55,0.25)", color: "var(--gov-gold)", fontFamily: "'Inter', sans-serif" }}
+              className="mt-2 inline-flex flex-col gap-0.5 px-3 py-1 rounded-full text-xs font-medium leading-tight"
+              style={{ background: "rgba(212,175,55,0.25)", color: "var(--gov-gold)" }}
             >
-              Citizen Service Portal
+              <span lang="si" style={{ fontFamily: "'Noto Sans Sinhala', sans-serif" }}>
+                පුරවැසි සේවා ද්වාරය
+              </span>
+              <span style={{ fontFamily: "'Inter', sans-serif" }}>Citizen Service Portal</span>
             </div>
           </div>
         </div>
@@ -154,6 +168,17 @@ export function HomeScreen({ onGetToken, onGiveFeedback }: Props) {
         <div className="mt-3 h-0.5 w-20 rounded" style={{ background: "var(--gov-gold)" }} />
         <p
           className="mt-3 max-w-md"
+          lang="si"
+          style={{
+            fontSize: "clamp(0.85rem, 2vw, 1rem)",
+            color: "var(--muted-foreground)",
+            fontFamily: "'Noto Sans Sinhala', sans-serif",
+          }}
+        >
+          ඉදිරියට යාමට පහත විකල්පවලින් එකක් තෝරන්න
+        </p>
+        <p
+          className="mt-1 max-w-md"
           style={{ fontSize: "clamp(0.85rem, 2vw, 1rem)", color: "var(--muted-foreground)", fontFamily: "'Inter', sans-serif" }}
         >
           Please select one of the options below to proceed
@@ -198,6 +223,13 @@ export function HomeScreen({ onGetToken, onGiveFeedback }: Props) {
               டோக்கன் பெறுக
             </p>
             <p
+              className="text-white/85 text-center leading-tight mb-1"
+              lang="si"
+              style={{ fontSize: "clamp(0.82rem, 2.2vw, 1.05rem)", fontWeight: 600, fontFamily: "'Noto Sans Sinhala', sans-serif" }}
+            >
+              සේවා ටෝකනය ලබාගන්න
+            </p>
+            <p
               className="text-white/70 text-center"
               style={{ fontSize: "clamp(0.8rem, 2vw, 1rem)", fontFamily: "'Inter', sans-serif" }}
             >
@@ -205,10 +237,13 @@ export function HomeScreen({ onGetToken, onGiveFeedback }: Props) {
             </p>
 
             <div
-              className="mt-5 px-6 py-2 rounded-full text-sm font-semibold"
-              style={{ background: "var(--gov-gold)", color: "#3D0010", fontFamily: "'Inter', sans-serif" }}
+              className="mt-5 px-6 py-2 rounded-full text-sm font-semibold text-center leading-tight"
+              style={{ background: "var(--gov-gold)", color: "#3D0010" }}
             >
-              Tap to Continue →
+              <span lang="si" style={{ display: "block", fontFamily: "'Noto Sans Sinhala', sans-serif" }}>
+                ඉදිරියට යාමට තට්ටු කරන්න
+              </span>
+              <span style={{ display: "block", fontFamily: "'Inter', sans-serif" }}>Tap to Continue →</span>
             </div>
           </button>
 
@@ -248,6 +283,18 @@ export function HomeScreen({ onGetToken, onGiveFeedback }: Props) {
               கருத்து பதிவு
             </p>
             <p
+              className="text-center leading-tight mb-1"
+              lang="si"
+              style={{
+                fontSize: "clamp(0.82rem, 2.2vw, 1.05rem)",
+                fontWeight: 600,
+                color: "var(--gov-maroon)",
+                fontFamily: "'Noto Sans Sinhala', sans-serif",
+              }}
+            >
+              ප්‍රතිචාර ලබාදෙන්න
+            </p>
+            <p
               className="text-center"
               style={{ fontSize: "clamp(0.8rem, 2vw, 1rem)", color: "var(--muted-foreground)", fontFamily: "'Inter', sans-serif" }}
             >
@@ -255,10 +302,13 @@ export function HomeScreen({ onGetToken, onGiveFeedback }: Props) {
             </p>
 
             <div
-              className="mt-5 px-6 py-2 rounded-full text-sm font-semibold"
-              style={{ background: "var(--gov-maroon)", color: "#fff", fontFamily: "'Inter', sans-serif" }}
+              className="mt-5 px-6 py-2 rounded-full text-sm font-semibold text-center leading-tight"
+              style={{ background: "var(--gov-maroon)", color: "#fff" }}
             >
-              Tap to Continue →
+              <span lang="si" style={{ display: "block", fontFamily: "'Noto Sans Sinhala', sans-serif" }}>
+                ඉදිරියට යාමට තට්ටු කරන්න
+              </span>
+              <span style={{ display: "block", fontFamily: "'Inter', sans-serif" }}>Tap to Continue →</span>
             </div>
           </button>
         </div>
