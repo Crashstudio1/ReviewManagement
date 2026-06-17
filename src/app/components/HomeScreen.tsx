@@ -74,7 +74,7 @@ export function HomeScreen({ onGetToken, onGiveFeedback }: Props) {
   return (
     <div
       className="flex flex-col min-h-screen"
-      style={{ background: "var(--gov-cream)", fontFamily: "'Noto Sans Tamil', 'Inter', sans-serif" }}
+      style={{ background: "var(--gov-cream)", fontFamily: "'Noto Sans Sinhala', 'Noto Sans Tamil', 'Inter', sans-serif" }}
     >
       {/* Header */}
       <header
@@ -132,6 +132,19 @@ export function HomeScreen({ onGetToken, onGiveFeedback }: Props) {
           style={{ fontSize: "clamp(2rem, 6vw, 3.2rem)", fontWeight: 700, color: "var(--gov-maroon)" }}
         >
           வரவேற்கிறோம்
+        </p>
+        <p
+          className="leading-tight"
+          lang="si"
+          style={{
+            fontSize: "clamp(1.4rem, 4vw, 2.1rem)",
+            fontWeight: 700,
+            color: "var(--gov-maroon)",
+            fontFamily: "'Noto Sans Sinhala', 'Inter', sans-serif",
+            marginTop: 6,
+          }}
+        >
+          සාදරයෙන් පිළිගනිමු
         </p>
         <p
           style={{ fontSize: "clamp(1rem, 3vw, 1.4rem)", color: "var(--muted-foreground)", fontFamily: "'Inter', sans-serif", marginTop: 4 }}
