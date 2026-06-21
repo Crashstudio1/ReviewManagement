@@ -285,26 +285,38 @@ export function TokenGenerated({ token, serviceName, serviceEmoji, onHome }: Pro
           position: fixed;
           top: 0;
           left: -10000px;
-          width: 72mm;
-          padding: 0;
+          width: 80mm;
+          padding: 4mm 4mm 5mm;
+          box-sizing: border-box;
           background: #fff;
           color: #000;
           font-family: Arial, Helvetica, sans-serif;
           font-size: 11px;
           line-height: 1.35;
+          overflow: hidden;
+          page-break-inside: avoid;
+          break-inside: avoid;
         }
         .ticket-center { text-align: center; }
-        .ticket-title { font-size: 13px; font-weight: 700; }
+        .ticket-title { font-size: 13px; font-weight: 700; overflow-wrap: break-word; }
         .ticket-subtitle { margin-top: 2px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
         .ticket-rule { margin: 7px 0; border-top: 1px dashed #000; }
-        .ticket-service { font-size: 12px; font-weight: 700; }
-        .ticket-token { margin: 8px 0; font-size: 38px; font-weight: 900; letter-spacing: 2px; }
+        .ticket-service { font-size: 12px; font-weight: 700; overflow-wrap: break-word; }
+        .ticket-token { margin: 8px 0; font-size: 38px; font-weight: 900; letter-spacing: 2px; white-space: nowrap; }
         .ticket-row { display: flex; justify-content: space-between; gap: 8px; margin: 3px 0; }
         .ticket-note { font-size: 10px; }
         @media print {
           @page {
             size: 80mm auto;
-            margin: 4mm;
+            margin: 0;
+          }
+          html,
+          body {
+            width: 80mm !important;
+            min-width: 80mm !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: hidden !important;
           }
           body * {
             visibility: hidden !important;
@@ -317,7 +329,11 @@ export function TokenGenerated({ token, serviceName, serviceEmoji, onHome }: Pro
             position: fixed;
             left: 0;
             top: 0;
-            width: 72mm;
+            width: 80mm;
+            max-width: 80mm;
+            margin: 0;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
           }
         }
       `}</style>
