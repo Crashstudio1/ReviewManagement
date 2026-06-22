@@ -9,6 +9,7 @@ const RECEIPT_SIDE_PADDING_MM = 1.5;
 const RECEIPT_TOP_PADDING_MM = 3;
 const RECEIPT_BOTTOM_PADDING_MM = 12;
 const TOKEN_SIZE_MULTIPLIER = 2;
+const RECEIPT_TOKEN_SIZE_MULTIPLIER = 1.55;
 const RECEIPT_TOKEN_WIDTH_SCALE = 0.54;
 const RECEIPT_BASE_FONT_PX = 10 * TOKEN_SIZE_MULTIPLIER;
 const RECEIPT_TITLE_FONT_PX = 11 * TOKEN_SIZE_MULTIPLIER;
@@ -34,9 +35,9 @@ function escapeHtml(value: string) {
 }
 
 function getReceiptTokenFontSize(token: string) {
-  if (token.length <= 4) return 20 * TOKEN_SIZE_MULTIPLIER;
-  if (token.length <= 6) return 16 * TOKEN_SIZE_MULTIPLIER;
-  return 13 * TOKEN_SIZE_MULTIPLIER;
+  if (token.length <= 4) return 20 * RECEIPT_TOKEN_SIZE_MULTIPLIER;
+  if (token.length <= 6) return 16 * RECEIPT_TOKEN_SIZE_MULTIPLIER;
+  return 13 * RECEIPT_TOKEN_SIZE_MULTIPLIER;
 }
 
 function buildReceiptHtml({ token, serviceName, printedDate, printedTime }: ReceiptPrintData) {
