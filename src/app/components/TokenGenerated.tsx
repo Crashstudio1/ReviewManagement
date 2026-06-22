@@ -4,7 +4,7 @@ import { Home, Printer, CheckCircle } from "lucide-react";
 const RECEIPT_ORGANIZATION_NAME = "Vavuniya South Tamil Pradeshiya Sabha";
 const RECEIPT_NOTE = "Please wait until your token number is called.";
 const RECEIPT_PAGE_WIDTH_MM = 80;
-const RECEIPT_SAFE_WIDTH_MM = 68;
+const RECEIPT_SAFE_WIDTH_MM = 80;
 const RECEIPT_SIDE_PADDING_MM = 3;
 
 interface ReceiptPrintData {
@@ -126,33 +126,7 @@ function printReceiptOnly(data: ReceiptPrintData) {
   }, 60000);
 }
 
-function isAndroidDevice() {
-  return /Android/i.test(window.navigator.userAgent);
-}
-
-function openReceiptOnly(data: ReceiptPrintData) {
-  const receiptWindow = window.open("", "_blank", "width=420,height=720");
-  if (!receiptWindow) {
-    printReceiptOnly(data);
-    return;
-  }
-
-  receiptWindow.document.open();
-  receiptWindow.document.write(buildReceiptHtml(data));
-  receiptWindow.document.close();
-
-  window.setTimeout(() => {
-    receiptWindow.focus();
-    receiptWindow.print();
-  }, 250);
-}
-
 function startReceiptPrint(data: ReceiptPrintData) {
-  if (isAndroidDevice()) {
-    openReceiptOnly(data);
-    return;
-  }
-
   printReceiptOnly(data);
 }
 
