@@ -25,9 +25,9 @@ function escapeHtml(value: string) {
 }
 
 function getReceiptTokenFontSize(token: string) {
-  if (token.length <= 4) return 32;
-  if (token.length <= 6) return 28;
-  return 24;
+  if (token.length <= 4) return 52;
+  if (token.length <= 6) return 46;
+  return 38;
 }
 
 function buildReceiptHtml({ token, serviceName, printedDate, printedTime }: ReceiptPrintData) {
@@ -69,7 +69,7 @@ function buildReceiptHtml({ token, serviceName, printedDate, printedTime }: Rece
     .ticket-subtitle { margin-top: 2px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
     .ticket-rule { margin: 6px 0; border-top: 1px dashed #000; }
     .ticket-service { font-size: 10px; font-weight: 700; overflow-wrap: break-word; }
-    .ticket-token { margin: 6px 0; max-width: 100%; overflow: hidden; font-size: ${tokenFontSize}px; font-weight: 900; letter-spacing: 0.5px; white-space: nowrap; text-align: center; }
+    .ticket-token { margin: 8px 0; max-width: 100%; overflow: hidden; font-size: ${tokenFontSize}px; line-height: 1; font-weight: 900; letter-spacing: 1px; white-space: nowrap; text-align: center; }
     .ticket-row { display: flex; justify-content: space-between; gap: 8px; margin: 3px 0; }
     .ticket-note { font-size: 9px; }
   </style>
@@ -456,7 +456,7 @@ export function TokenGenerated({ token, serviceName, serviceEmoji, onHome }: Pro
         .ticket-subtitle { margin-top: 2px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
         .ticket-rule { margin: 6px 0; border-top: 1px dashed #000; }
         .ticket-service { font-size: 10px; font-weight: 700; overflow-wrap: break-word; }
-        .ticket-token { margin: 6px 0; max-width: 100%; overflow: hidden; font-size: ${receiptTokenFontSize}px; font-weight: 900; letter-spacing: 0.5px; white-space: nowrap; }
+        .ticket-token { margin: 8px 0; max-width: 100%; overflow: hidden; font-size: ${receiptTokenFontSize}px; line-height: 1; font-weight: 900; letter-spacing: 1px; white-space: nowrap; }
         .ticket-row { display: flex; justify-content: space-between; gap: 8px; margin: 3px 0; }
         .ticket-note { font-size: 9px; }
         @media print {
