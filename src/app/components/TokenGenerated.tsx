@@ -4,7 +4,7 @@ import { Home, Printer, CheckCircle } from "lucide-react";
 const RECEIPT_ORGANIZATION_NAME = "Vavuniya South Tamil Pradeshiya Sabha";
 const RECEIPT_NOTE = "Please wait until your token number is called.";
 const RECEIPT_PAGE_WIDTH_MM = 80;
-const RECEIPT_SAFE_WIDTH_MM = 80;
+const RECEIPT_SAFE_WIDTH_MM = 76;
 const RECEIPT_SIDE_PADDING_MM = 1.5;
 const RECEIPT_TOP_PADDING_MM = 3;
 const RECEIPT_BOTTOM_PADDING_MM = 12;
