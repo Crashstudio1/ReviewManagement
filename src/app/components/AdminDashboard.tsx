@@ -169,7 +169,7 @@ function ServicesAdminPanel({
             Service Details
           </h2>
           <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
-            Add or update services in English, Tamil, and Sinhala for the citizen kiosk.
+            Add or update services, counter numbers, and names for the citizen kiosk.
           </p>
         </div>
         <div
@@ -213,6 +213,19 @@ function ServicesAdminPanel({
             style={{ ...inputStyle, "--tw-ring-color": "var(--gov-maroon)" } as React.CSSProperties}
             placeholder={suggestedCode}
             maxLength={4}
+          />
+
+          <label className="mb-2 block text-sm font-semibold" htmlFor="service-counter-number">
+            Counter Number
+          </label>
+          <input
+            id="service-counter-number"
+            value={form.counterNumber || ""}
+            onChange={(event) => onChange("counterNumber", event.target.value)}
+            className="mb-4 w-full rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2"
+            style={{ ...inputStyle, "--tw-ring-color": "var(--gov-maroon)" } as React.CSSProperties}
+            placeholder="Example: 1"
+            maxLength={32}
           />
 
           <label className="mb-2 block text-sm font-semibold" htmlFor="service-emoji">
@@ -341,7 +354,7 @@ function ServicesAdminPanel({
           <table className="w-full">
             <thead>
               <tr style={{ background: "var(--gov-cream)" }}>
-                {["Code", "Icon", "English", "Tamil", "Sinhala", "Actions"].map((header) => (
+                {["Code", "Counter", "Icon", "English", "Tamil", "Sinhala", "Actions"].map((header) => (
                   <th
                     key={header}
                     className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide"
@@ -357,6 +370,9 @@ function ServicesAdminPanel({
                 <tr key={service.code} className="border-t" style={{ borderColor: "var(--border)" }}>
                   <td className="px-5 py-3.5 text-sm font-bold" style={{ color: "var(--gov-maroon)" }}>
                     {service.code}
+                  </td>
+                  <td className="px-5 py-3.5 text-sm font-semibold" style={{ color: "var(--foreground)" }}>
+                    {service.counterNumber?.trim() || "-"}
                   </td>
                   <td className="px-5 py-3.5 text-xl">{service.emoji}</td>
                   <td className="px-5 py-3.5 text-sm" style={{ color: "var(--foreground)" }}>
@@ -902,6 +918,7 @@ export function AdminDashboard({
   const [serviceForm, setServiceForm] = useState<Service>({
     emoji: "📋",
     code: suggestedCode,
+    counterNumber: "",
     en: "",
     ta: "",
     si: "",
@@ -1031,6 +1048,7 @@ export function AdminDashboard({
     setServiceForm({
       emoji: "\uD83D\uDCCB",
       code: getNextServiceCode(nextServices),
+      counterNumber: "",
       en: "",
       ta: "",
       si: "",
@@ -1040,7 +1058,11 @@ export function AdminDashboard({
 
   function handleEditService(service: Service) {
     setEditingServiceCode(service.code.trim().toUpperCase());
-    setServiceForm({ ...service, code: service.code.trim().toUpperCase() });
+    setServiceForm({
+      ...service,
+      code: service.code.trim().toUpperCase(),
+      counterNumber: service.counterNumber || "",
+    });
     setServiceError("");
     setServiceMessage("");
   }
@@ -1074,6 +1096,7 @@ export function AdminDashboard({
     const nextService: Service = {
       emoji: serviceForm.emoji.trim() || "\uD83D\uDCCB",
       code: serviceForm.code.trim().toUpperCase(),
+      counterNumber: (serviceForm.counterNumber || "").trim(),
       en: serviceForm.en.trim(),
       ta: serviceForm.ta.trim(),
       si: serviceForm.si.trim(),

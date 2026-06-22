@@ -13,6 +13,7 @@ const ddl = [
     name_ta VARCHAR(255) NOT NULL,
     name_si VARCHAR(255) NOT NULL,
     name_en VARCHAR(255) NOT NULL,
+    counter_number VARCHAR(32) NOT NULL DEFAULT '',
     active TINYINT(1) NOT NULL DEFAULT 1,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -113,6 +114,10 @@ try {
     `ALTER TABLE feedback
      ADD COLUMN service_name VARCHAR(255) NULL AFTER service_code`,
   );
+  await addColumnIfMissing(
+    `ALTER TABLE services
+     ADD COLUMN counter_number VARCHAR(32) NOT NULL DEFAULT '' AFTER name_en`,
+  );
   try {
     await bootstrapPool.query(
       `CREATE INDEX idx_feedback_service_code ON feedback (service_code)`,
@@ -122,15 +127,16 @@ try {
   }
   for (const service of defaultServices) {
     await bootstrapPool.query(
-      `INSERT INTO services (code, emoji, name_ta, name_si, name_en)
-       VALUES (?, ?, ?, ?, ?)
+      `INSERT INTO services (code, emoji, name_ta, name_si, name_en, counter_number)
+       VALUES (?, ?, ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE
          emoji = VALUES(emoji),
          name_ta = VALUES(name_ta),
          name_si = VALUES(name_si),
          name_en = VALUES(name_en),
+         counter_number = counter_number,
          active = 1`,
-      [service.code, service.emoji, service.ta, service.si, service.en],
+      [service.code, service.emoji, service.ta, service.si, service.en, service.counterNumber || ""],
     );
   }
   for (const [key, value] of Object.entries(defaultSettings)) {

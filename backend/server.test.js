@@ -62,6 +62,7 @@ test("GET /api/services maps database rows to kiosk services", async () => {
           name_ta: "Tamil service",
           name_si: "Sinhala service",
           name_en: "English service",
+          counter_number: "2",
         },
       ]];
     },
@@ -78,6 +79,7 @@ test("GET /api/services maps database rows to kiosk services", async () => {
         ta: "Tamil service",
         si: "Sinhala service",
         en: "English service",
+        counterNumber: "2",
       },
     ]);
   });
@@ -207,6 +209,7 @@ test("PUT /api/services/:code updates an existing service", async () => {
         ta: "Tamil updated",
         si: "Sinhala updated",
         en: "English updated",
+        counterNumber: "4",
       }),
     });
 
@@ -217,6 +220,7 @@ test("PUT /api/services/:code updates an existing service", async () => {
       ta: "Tamil updated",
       si: "Sinhala updated",
       en: "English updated",
+      counterNumber: "4",
     });
   });
 
@@ -227,6 +231,7 @@ test("PUT /api/services/:code updates an existing service", async () => {
     "Tamil updated",
     "Sinhala updated",
     "English updated",
+    "4",
     "A",
   ]);
 });
@@ -302,6 +307,7 @@ test("POST /api/tokens issues the next token inside a transaction", async () => 
           name_ta: "Tamil",
           name_si: "Sinhala",
           name_en: "English",
+          counter_number: "3",
           active: 1,
         }]];
       }
@@ -342,6 +348,7 @@ test("POST /api/tokens issues the next token inside a transaction", async () => 
         ta: "Tamil",
         si: "Sinhala",
         en: "English",
+        counterNumber: "3",
       },
       issuedYear: new Date().getFullYear(),
     });

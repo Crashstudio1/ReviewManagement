@@ -7,7 +7,8 @@ const RECEIPT_PAGE_WIDTH_MM = 80;
 const RECEIPT_SAFE_WIDTH_MM = 80;
 const RECEIPT_SIDE_PADDING_MM = 1.5;
 const RECEIPT_TOP_PADDING_MM = 3;
-const RECEIPT_BOTTOM_PADDING_MM = 12;
+const RECEIPT_BOTTOM_PADDING_MM = 24;
+const RECEIPT_NOTE_BOTTOM_PADDING_MM = 6;
 const TOKEN_SIZE_MULTIPLIER = 2;
 const RECEIPT_TOKEN_SIZE_MULTIPLIER = 1.35;
 const RECEIPT_TOKEN_WIDTH_SCALE = 1;
@@ -20,6 +21,7 @@ const RECEIPT_NOTE_FONT_PX = 8 * TOKEN_SIZE_MULTIPLIER;
 interface ReceiptPrintData {
   token: string;
   serviceName: string;
+  counterInstruction: string;
   printedDate: string;
   printedTime: string;
 }
@@ -40,7 +42,7 @@ function getReceiptTokenFontSize(token: string) {
   return 13 * RECEIPT_TOKEN_SIZE_MULTIPLIER;
 }
 
-function buildReceiptHtml({ token, serviceName, printedDate, printedTime }: ReceiptPrintData) {
+function buildReceiptHtml({ token, serviceName, counterInstruction, printedDate, printedTime }: ReceiptPrintData) {
   const tokenFontSize = getReceiptTokenFontSize(token);
 
   return `<!doctype html>
@@ -82,7 +84,7 @@ function buildReceiptHtml({ token, serviceName, printedDate, printedTime }: Rece
     .ticket-token { margin: ${8 * TOKEN_SIZE_MULTIPLIER}px 0; max-width: 100%; overflow: visible; font-family: "Arial Black", Arial, Helvetica, sans-serif; font-size: ${tokenFontSize}mm; line-height: 1; font-weight: 900; letter-spacing: 0.5mm; white-space: nowrap; text-align: center; }
     .ticket-token-text { display: inline-block; transform: scaleX(${RECEIPT_TOKEN_WIDTH_SCALE}); transform-origin: center; }
     .ticket-row { display: flex; justify-content: space-between; gap: ${8 * TOKEN_SIZE_MULTIPLIER}px; margin: ${3 * TOKEN_SIZE_MULTIPLIER}px 0; }
-    .ticket-note { font-size: ${RECEIPT_NOTE_FONT_PX}px; line-height: 1.2; padding-bottom: 2mm; }
+    .ticket-note { font-size: ${RECEIPT_NOTE_FONT_PX}px; line-height: 1.2; padding-bottom: ${RECEIPT_NOTE_BOTTOM_PADDING_MM}mm; }
   </style>
 </head>
 <body>
@@ -92,6 +94,7 @@ function buildReceiptHtml({ token, serviceName, printedDate, printedTime }: Rece
     <div class="ticket-rule"></div>
     <div class="ticket-center ticket-service">${escapeHtml(serviceName)}</div>
     <div class="ticket-token"><span class="ticket-token-text">${escapeHtml(token)}</span></div>
+    <div class="ticket-center ticket-note">${escapeHtml(counterInstruction)}</div>
     <div class="ticket-row"><span>Date</span><strong>${escapeHtml(printedDate)}</strong></div>
     <div class="ticket-row"><span>Time</span><strong>${escapeHtml(printedTime)}</strong></div>
     <div class="ticket-rule"></div>
@@ -160,10 +163,11 @@ interface Props {
   token: string;
   serviceName: string;
   serviceEmoji: string;
+  counterNumber: string;
   onHome: () => void;
 }
 
-export function TokenGenerated({ token, serviceName, serviceEmoji, onHome }: Props) {
+export function TokenGenerated({ token, serviceName, serviceEmoji, counterNumber, onHome }: Props) {
   const [countdown, setCountdown] = useState(30);
   const [printing, setPrinting] = useState(true);
   const [printed, setPrinted] = useState(false);
@@ -171,12 +175,17 @@ export function TokenGenerated({ token, serviceName, serviceEmoji, onHome }: Pro
 
   const printedDate = issuedAt.toLocaleDateString("en-GB");
   const printedTime = issuedAt.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  const counterLabel = counterNumber.trim();
+  const counterInstruction = counterLabel
+    ? `You have to go to the counter ${counterLabel}`
+    : "Counter is not assigned";
   const receiptPrintData = useMemo(() => ({
     token,
     serviceName: `${serviceEmoji} ${serviceName}`,
+    counterInstruction,
     printedDate,
     printedTime,
-  }), [printedDate, printedTime, serviceEmoji, serviceName, token]);
+  }), [counterInstruction, printedDate, printedTime, serviceEmoji, serviceName, token]);
   const receiptTokenFontSize = getReceiptTokenFontSize(token);
 
   useEffect(() => {
@@ -329,10 +338,10 @@ export function TokenGenerated({ token, serviceName, serviceEmoji, onHome }: Pro
               <div className="w-px" style={{ background: "var(--border)" }} />
               <div className="text-center">
                 <p style={{ color: "var(--muted-foreground)", fontFamily: "'Inter', sans-serif", fontSize: "clamp(0.85rem, 2.4vw, 1.5rem)" }}>
-                  Counter
+                  Instruction
                 </p>
                 <p className="font-semibold" style={{ color: "var(--foreground)", fontFamily: "'Inter', sans-serif", fontSize: "clamp(1rem, 2.8vw, 1.75rem)" }}>
-                  A
+                  {counterInstruction}
                 </p>
               </div>
             </div>
@@ -440,6 +449,7 @@ export function TokenGenerated({ token, serviceName, serviceEmoji, onHome }: Pro
         <div className="ticket-rule" />
         <div className="ticket-center ticket-service">{serviceEmoji} {serviceName}</div>
         <div className="ticket-center ticket-token"><span className="ticket-token-text">{token}</span></div>
+        <div className="ticket-center ticket-note">{counterInstruction}</div>
         <div className="ticket-row"><span>Date</span><strong>{printedDate}</strong></div>
         <div className="ticket-row"><span>Time</span><strong>{printedTime}</strong></div>
         <div className="ticket-rule" />
@@ -479,7 +489,7 @@ export function TokenGenerated({ token, serviceName, serviceEmoji, onHome }: Pro
         .ticket-token { margin: ${8 * TOKEN_SIZE_MULTIPLIER}px 0; max-width: 100%; overflow: visible; font-family: "Arial Black", Arial, Helvetica, sans-serif; font-size: ${receiptTokenFontSize}mm; line-height: 1; font-weight: 900; letter-spacing: 0.5mm; white-space: nowrap; }
         .ticket-token-text { display: inline-block; transform: scaleX(${RECEIPT_TOKEN_WIDTH_SCALE}); transform-origin: center; }
         .ticket-row { display: flex; justify-content: space-between; gap: ${8 * TOKEN_SIZE_MULTIPLIER}px; margin: ${3 * TOKEN_SIZE_MULTIPLIER}px 0; }
-        .ticket-note { font-size: ${RECEIPT_NOTE_FONT_PX}px; line-height: 1.2; padding-bottom: 2mm; }
+        .ticket-note { font-size: ${RECEIPT_NOTE_FONT_PX}px; line-height: 1.2; padding-bottom: ${RECEIPT_NOTE_BOTTOM_PADDING_MM}mm; }
         @media print {
           @page {
             size: ${RECEIPT_PAGE_WIDTH_MM}mm auto;

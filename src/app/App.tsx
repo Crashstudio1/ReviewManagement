@@ -26,6 +26,7 @@ interface GeneratedToken {
   serviceCode: string;
   serviceName: string;
   serviceEmoji: string;
+  counterNumber: string;
 }
 
 const SERVICES_STORAGE_KEY = "gov-citizen-review-services";
@@ -152,6 +153,7 @@ export default function App() {
         serviceCode: issued.service.code,
         serviceName: issued.service.en,
         serviceEmoji: issued.service.emoji,
+        counterNumber: issued.service.counterNumber || svc.counterNumber || "",
       });
       setScreen("token-generated");
       api.getTokenCounters()
@@ -166,7 +168,13 @@ export default function App() {
     const token = `${svc.code}${String(next).padStart(3, "0")}`;
     setTokenCounters((prev) => ({ ...prev, [svc.code]: next }));
     recordTokenUsage(String(new Date().getFullYear()), svc.code);
-    setGeneratedToken({ token, serviceCode: svc.code, serviceName: svc.en, serviceEmoji: svc.emoji });
+    setGeneratedToken({
+      token,
+      serviceCode: svc.code,
+      serviceName: svc.en,
+      serviceEmoji: svc.emoji,
+      counterNumber: svc.counterNumber || "",
+    });
     setScreen("token-generated");
   }
 
@@ -329,6 +337,7 @@ export default function App() {
           token={generatedToken.token}
           serviceName={generatedToken.serviceName}
           serviceEmoji={generatedToken.serviceEmoji}
+          counterNumber={generatedToken.counterNumber}
           onHome={goHome}
         />
       )}

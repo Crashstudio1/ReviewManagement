@@ -16,6 +16,7 @@ function toService(row) {
     ta: row.name_ta,
     si: row.name_si,
     en: row.name_en,
+    counterNumber: row.counter_number || "",
   };
 }
 
@@ -26,6 +27,7 @@ function normalizeService(input = {}) {
     ta: String(input.ta || "").trim(),
     si: String(input.si || "").trim(),
     en: String(input.en || "").trim(),
+    counterNumber: String(input.counterNumber || input.counter_number || "").trim(),
   };
 }
 
@@ -126,7 +128,7 @@ app.get("/api/health", async (_req, res, next) => {
 app.get("/api/services", async (_req, res, next) => {
   try {
     const [rows] = await apiPool.query(
-      `SELECT code, emoji, name_ta, name_si, name_en
+      `SELECT code, emoji, name_ta, name_si, name_en, counter_number
        FROM services
        WHERE active = 1
        ORDER BY code`,
@@ -205,15 +207,16 @@ app.post("/api/services", requireAdmin, async (req, res, next) => {
     requireServiceFields(service);
 
     const [result] = await apiPool.query(
-      `INSERT INTO services (code, emoji, name_ta, name_si, name_en)
-       VALUES (?, ?, ?, ?, ?)
+      `INSERT INTO services (code, emoji, name_ta, name_si, name_en, counter_number)
+       VALUES (?, ?, ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE
          emoji = VALUES(emoji),
          name_ta = VALUES(name_ta),
          name_si = VALUES(name_si),
          name_en = VALUES(name_en),
+         counter_number = VALUES(counter_number),
          active = 1`,
-      [service.code, service.emoji, service.ta, service.si, service.en],
+      [service.code, service.emoji, service.ta, service.si, service.en, service.counterNumber],
     );
 
     res.status(result.insertId ? 201 : 200).json(service);
@@ -234,9 +237,9 @@ app.put("/api/services/:code", requireAdmin, async (req, res, next) => {
 
     const [result] = await apiPool.query(
       `UPDATE services
-       SET code = ?, emoji = ?, name_ta = ?, name_si = ?, name_en = ?, active = 1
+       SET code = ?, emoji = ?, name_ta = ?, name_si = ?, name_en = ?, counter_number = ?, active = 1
        WHERE code = ?`,
-      [service.code, service.emoji, service.ta, service.si, service.en, currentCode],
+      [service.code, service.emoji, service.ta, service.si, service.en, service.counterNumber, currentCode],
     );
 
     if (result.affectedRows === 0) {
@@ -290,7 +293,7 @@ app.post("/api/tokens", async (req, res, next) => {
     await connection.beginTransaction();
 
     const [serviceRows] = await connection.query(
-      `SELECT code, emoji, name_ta, name_si, name_en, active
+      `SELECT code, emoji, name_ta, name_si, name_en, counter_number, active
        FROM services
        WHERE code = ?
        FOR UPDATE`,
@@ -308,9 +311,16 @@ app.post("/api/tokens", async (req, res, next) => {
     if (!service) {
       requireServiceFields({ ...incomingService, code: serviceCode });
       await connection.query(
-        `INSERT INTO services (code, emoji, name_ta, name_si, name_en)
-         VALUES (?, ?, ?, ?, ?)`,
-        [serviceCode, incomingService.emoji, incomingService.ta, incomingService.si, incomingService.en],
+        `INSERT INTO services (code, emoji, name_ta, name_si, name_en, counter_number)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [
+          serviceCode,
+          incomingService.emoji,
+          incomingService.ta,
+          incomingService.si,
+          incomingService.en,
+          incomingService.counterNumber,
+        ],
       );
       service = { ...incomingService, code: serviceCode };
     }

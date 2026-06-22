@@ -8,6 +8,7 @@ interface Service {
   si: string;
   en: string;
   code: string;
+  counterNumber?: string;
 }
 
 export const DEFAULT_SERVICES: Service[] = [
@@ -95,6 +96,10 @@ export function ServiceSelection({ onSelect, onBack, tokenCounters, services }: 
           {services.map((svc) => {
             const nextToken = (tokenCounters[svc.code] || 0) + 1;
             const tokenStr = `${svc.code}${String(nextToken).padStart(3, "0")}`;
+            const counterNumber = svc.counterNumber?.trim();
+            const counterInstruction = counterNumber
+              ? `You have to go to the counter ${counterNumber}`
+              : "Counter is not assigned";
             return (
               <button
                 key={svc.code}
@@ -102,7 +107,7 @@ export function ServiceSelection({ onSelect, onBack, tokenCounters, services }: 
                 className="group flex flex-col items-center text-center rounded-2xl p-5 shadow-sm transition-all duration-150 active:scale-95 focus:outline-none bg-white"
                 style={{
                   border: "2px solid var(--border)",
-                  minHeight: 188,
+                  minHeight: 208,
                 }}
                 onMouseEnter={(e) => {
                   const el = e.currentTarget as HTMLButtonElement;
@@ -163,6 +168,12 @@ export function ServiceSelection({ onSelect, onBack, tokenCounters, services }: 
                 </p>
                 <div
                   className="mt-2 text-xs px-2 py-0.5 rounded-full"
+                  style={{ background: "var(--gov-cream)", color: "var(--muted-foreground)", fontFamily: "'Inter', sans-serif" }}
+                >
+                  {counterInstruction}
+                </div>
+                <div
+                  className="mt-1 text-xs px-2 py-0.5 rounded-full"
                   style={{ background: "var(--gov-cream)", color: "var(--muted-foreground)", fontFamily: "'Inter', sans-serif" }}
                 >
                   Next: {tokenStr}
