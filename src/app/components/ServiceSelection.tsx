@@ -1,6 +1,7 @@
 import { ArrowLeft } from "lucide-react";
 import { DevelopingPartner } from "./DevelopingPartner";
 import { GovernmentLogo } from "./GovernmentLogo";
+import { getNextTemporaryTokenNumber } from "../tokenNumbers";
 
 interface Service {
   emoji: string;
@@ -29,10 +30,11 @@ export const DEFAULT_SERVICES: Service[] = [
 interface Props {
   onSelect: (service: Service) => void;
   onBack: () => void;
+  tokenCounters: Record<string, number>;
   services: Service[];
 }
 
-export function ServiceSelection({ onSelect, onBack, services }: Props) {
+export function ServiceSelection({ onSelect, onBack, tokenCounters, services }: Props) {
   return (
     <div
       className="flex flex-col min-h-screen"
@@ -93,7 +95,8 @@ export function ServiceSelection({ onSelect, onBack, services }: Props) {
       <main className="flex-1 p-5 overflow-auto">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 max-w-5xl mx-auto">
           {services.map((svc) => {
-            const tokenRange = `${svc.code}300-${svc.code}400`;
+            const nextToken = getNextTemporaryTokenNumber(svc.code, tokenCounters[svc.code] || 0);
+            const tokenStr = `${svc.code}${String(nextToken).padStart(3, "0")}`;
             const counterNumber = svc.counterNumber?.trim();
             const counterInstruction = counterNumber
               ? `You have to go to the counter ${counterNumber}`
@@ -174,7 +177,7 @@ export function ServiceSelection({ onSelect, onBack, services }: Props) {
                   className="mt-1 text-xs px-2 py-0.5 rounded-full"
                   style={{ background: "var(--gov-cream)", color: "var(--muted-foreground)", fontFamily: "'Inter', sans-serif" }}
                 >
-                  Token: {tokenRange}
+                  Next: {tokenStr}
                 </div>
               </button>
             );

@@ -8,11 +8,24 @@ import { pool } from "./db.js";
 
 const port = Number(process.env.API_PORT || 4000);
 const currentFile = fileURLToPath(import.meta.url);
-const TEMPORARY_TOKEN_MIN = 300;
-const TEMPORARY_TOKEN_MAX = 400;
+const DEFAULT_TEMPORARY_TOKEN_START = 300;
+const TEMPORARY_TOKEN_STARTS = {
+  A: 303,
+  B: 250,
+  C: 305,
+  D: 310,
+  E: 315,
+  F: 320,
+  G: 325,
+  H: 330,
+  I: 335,
+  J: 340,
+  K: 345,
+  L: 350,
+};
 
-function getTemporaryRandomTokenNumber() {
-  return Math.floor(Math.random() * (TEMPORARY_TOKEN_MAX - TEMPORARY_TOKEN_MIN + 1)) + TEMPORARY_TOKEN_MIN;
+function getTemporaryTokenStart(serviceCode) {
+  return TEMPORARY_TOKEN_STARTS[serviceCode] || DEFAULT_TEMPORARY_TOKEN_START;
 }
 
 function toService(row) {
@@ -338,7 +351,7 @@ app.post("/api/tokens", async (req, res, next) => {
       [serviceCode],
     );
 
-    await connection.query(
+    const [counterRows] = await connection.query(
       `SELECT counter
        FROM token_counters
        WHERE service_code = ?
@@ -346,15 +359,16 @@ app.post("/api/tokens", async (req, res, next) => {
       [serviceCode],
     );
 
-    const tokenNumber = getTemporaryRandomTokenNumber();
-    const token = `${serviceCode}${String(tokenNumber).padStart(3, "0")}`;
+    const currentCounter = Number(counterRows[0]?.counter || 0);
+    const nextCounter = Math.max(currentCounter + 1, getTemporaryTokenStart(serviceCode));
+    const token = `${serviceCode}${String(nextCounter).padStart(3, "0")}`;
     const issuedYear = new Date().getFullYear();
 
     await connection.query(
       `UPDATE token_counters
        SET counter = ?
        WHERE service_code = ?`,
-      [tokenNumber, serviceCode],
+      [nextCounter, serviceCode],
     );
 
     await connection.query(

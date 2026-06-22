@@ -8,6 +8,7 @@ import { AdminLogin } from "./components/AdminLogin";
 import { AdminDashboard } from "./components/AdminDashboard";
 import { AnalyticsPage } from "./components/AnalyticsPage";
 import { api, type AuthUser, type TokenUsageByYear } from "./api";
+import { getNextTemporaryTokenNumber } from "./tokenNumbers";
 
 /* MARKER-MAKE-KIT-INVOKED */
 
@@ -31,12 +32,6 @@ interface GeneratedToken {
 
 const SERVICES_STORAGE_KEY = "gov-citizen-review-services";
 const TOKEN_USAGE_STORAGE_KEY = "gov-citizen-review-token-usage";
-const TEMPORARY_TOKEN_MIN = 300;
-const TEMPORARY_TOKEN_MAX = 400;
-
-function getTemporaryRandomTokenNumber() {
-  return Math.floor(Math.random() * (TEMPORARY_TOKEN_MAX - TEMPORARY_TOKEN_MIN + 1)) + TEMPORARY_TOKEN_MIN;
-}
 
 function loadServices() {
   try {
@@ -170,9 +165,9 @@ export default function App() {
       // Fall back to local token issuing when the MySQL API is unavailable.
     }
 
-    const tokenNumber = getTemporaryRandomTokenNumber();
-    const token = `${svc.code}${String(tokenNumber).padStart(3, "0")}`;
-    setTokenCounters((prev) => ({ ...prev, [svc.code]: tokenNumber }));
+    const next = getNextTemporaryTokenNumber(svc.code, tokenCounters[svc.code] || 0);
+    const token = `${svc.code}${String(next).padStart(3, "0")}`;
+    setTokenCounters((prev) => ({ ...prev, [svc.code]: next }));
     recordTokenUsage(String(new Date().getFullYear()), svc.code);
     setGeneratedToken({
       token,
@@ -333,6 +328,7 @@ export default function App() {
         <ServiceSelection
           onSelect={handleSelectService}
           onBack={goHome}
+          tokenCounters={tokenCounters}
           services={services}
         />
       )}
