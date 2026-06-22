@@ -177,7 +177,7 @@ export function ServiceSelection({ onSelect, onBack, tokenCounters, services }: 
                   className="mt-1 text-xs px-2 py-0.5 rounded-full"
                   style={{ background: "var(--gov-cream)", color: "var(--muted-foreground)", fontFamily: "'Inter', sans-serif" }}
                 >
-                  Next: {tokenStr}
+                  Token: {tokenStr}
                 </div>
               </button>
             );
