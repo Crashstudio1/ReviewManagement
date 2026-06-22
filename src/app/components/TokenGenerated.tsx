@@ -8,6 +8,11 @@ const RECEIPT_SAFE_WIDTH_MM = 80;
 const RECEIPT_SIDE_PADDING_MM = 3;
 const TOKEN_SIZE_MULTIPLIER = 2;
 const RECEIPT_TOKEN_WIDTH_SCALE = 1 / TOKEN_SIZE_MULTIPLIER;
+const RECEIPT_BASE_FONT_PX = 10 * TOKEN_SIZE_MULTIPLIER;
+const RECEIPT_TITLE_FONT_PX = 11 * TOKEN_SIZE_MULTIPLIER;
+const RECEIPT_SUBTITLE_FONT_PX = 10 * TOKEN_SIZE_MULTIPLIER;
+const RECEIPT_SERVICE_FONT_PX = 10 * TOKEN_SIZE_MULTIPLIER;
+const RECEIPT_NOTE_FONT_PX = 9 * TOKEN_SIZE_MULTIPLIER;
 
 interface ReceiptPrintData {
   token: string;
@@ -60,21 +65,21 @@ function buildReceiptHtml({ token, serviceName, printedDate, printedTime }: Rece
       background: #fff;
       color: #000;
       font-family: Arial, Helvetica, sans-serif;
-      font-size: 10px;
+      font-size: ${RECEIPT_BASE_FONT_PX}px;
       line-height: 1.35;
       overflow: hidden;
       page-break-inside: avoid;
       break-inside: avoid;
     }
     .ticket-center { text-align: center; }
-    .ticket-title { font-size: 11px; font-weight: 700; overflow-wrap: break-word; }
-    .ticket-subtitle { margin-top: 2px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
-    .ticket-rule { margin: 6px 0; border-top: 1px dashed #000; }
-    .ticket-service { font-size: 10px; font-weight: 700; overflow-wrap: break-word; }
-    .ticket-token { margin: 8px 0; max-width: 100%; overflow: visible; font-family: "Arial Black", Arial, Helvetica, sans-serif; font-size: ${tokenFontSize}mm; line-height: 1; font-weight: 900; letter-spacing: 0.5mm; white-space: nowrap; text-align: center; }
+    .ticket-title { font-size: ${RECEIPT_TITLE_FONT_PX}px; font-weight: 700; overflow-wrap: break-word; }
+    .ticket-subtitle { margin-top: ${2 * TOKEN_SIZE_MULTIPLIER}px; font-size: ${RECEIPT_SUBTITLE_FONT_PX}px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .ticket-rule { margin: ${6 * TOKEN_SIZE_MULTIPLIER}px 0; border-top: 1px dashed #000; }
+    .ticket-service { font-size: ${RECEIPT_SERVICE_FONT_PX}px; font-weight: 700; overflow-wrap: break-word; }
+    .ticket-token { margin: ${8 * TOKEN_SIZE_MULTIPLIER}px 0; max-width: 100%; overflow: visible; font-family: "Arial Black", Arial, Helvetica, sans-serif; font-size: ${tokenFontSize}mm; line-height: 1; font-weight: 900; letter-spacing: 0.5mm; white-space: nowrap; text-align: center; }
     .ticket-token-text { display: inline-block; transform: scaleX(${RECEIPT_TOKEN_WIDTH_SCALE}); transform-origin: center; }
-    .ticket-row { display: flex; justify-content: space-between; gap: 8px; margin: 3px 0; }
-    .ticket-note { font-size: 9px; }
+    .ticket-row { display: flex; justify-content: space-between; gap: ${8 * TOKEN_SIZE_MULTIPLIER}px; margin: ${3 * TOKEN_SIZE_MULTIPLIER}px 0; }
+    .ticket-note { font-size: ${RECEIPT_NOTE_FONT_PX}px; }
   </style>
 </head>
 <body>
@@ -208,7 +213,7 @@ export function TokenGenerated({ token, serviceName, serviceEmoji, onHome }: Pro
         }}
       />
 
-      <div className="relative w-full max-w-md mx-auto flex flex-col items-center">
+      <div className="relative w-full max-w-2xl mx-auto flex flex-col items-center">
         {/* Animated check icon */}
         <div className="relative mb-6">
           <div
@@ -232,43 +237,49 @@ export function TokenGenerated({ token, serviceName, serviceEmoji, onHome }: Pro
 
         {/* Token Card */}
         <div
-          className="w-full rounded-3xl overflow-hidden shadow-2xl mb-6"
+          className="w-full rounded-3xl overflow-hidden shadow-2xl mb-8"
           style={{ background: "#fff", border: "2px solid rgba(46,125,50,0.2)" }}
         >
           {/* Card header */}
           <div
-            className="flex items-center justify-between px-6 py-4"
+            className="flex flex-wrap items-center justify-between gap-4 px-8 py-6"
             style={{ background: "linear-gradient(135deg, #2E7D32 0%, #388E3C 100%)" }}
           >
-            <div className="flex items-center gap-3">
+            <div className="flex min-w-0 items-center gap-4">
               <div
                 className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
                 style={{ background: "rgba(255,255,255,0.18)" }}
               >
                 <TokenIcon size={26} color="#fff" />
               </div>
-              <div>
-                <p className="text-white/80 text-sm" style={{ fontFamily: "'Inter', sans-serif" }}>
+              <div className="min-w-0">
+                <p
+                  className="text-white/80"
+                  style={{ fontFamily: "'Inter', sans-serif", fontSize: "clamp(1.1rem, 3.2vw, 1.75rem)", lineHeight: 1.15 }}
+                >
                   {serviceEmoji} {serviceName}
                 </p>
-                <p className="text-white font-semibold text-xs mt-0.5" style={{ fontFamily: "'Inter', sans-serif" }}>
+                <p
+                  className="text-white font-semibold mt-1"
+                  style={{ fontFamily: "'Inter', sans-serif", fontSize: "clamp(0.95rem, 2.6vw, 1.5rem)", lineHeight: 1.15 }}
+                >
                   Service Token
                 </p>
               </div>
             </div>
             <div
-              className="px-3 py-1 rounded-full text-xs font-bold"
-              style={{ background: "rgba(255,255,255,0.2)", color: "#fff", fontFamily: "'Inter', sans-serif" }}
+              className="px-4 py-2 rounded-full font-bold"
+              style={{ background: "rgba(255,255,255,0.2)", color: "#fff", fontFamily: "'Inter', sans-serif", fontSize: "clamp(0.9rem, 2.4vw, 1.5rem)" }}
             >
               VALID TODAY
             </div>
           </div>
 
           {/* Token number */}
-          <div className="flex flex-col items-center py-10 px-6">
+          <div className="flex flex-col items-center py-12 px-8">
             <p
-              className="text-sm mb-2"
-              style={{ color: "var(--muted-foreground)", fontFamily: "'Inter', sans-serif", letterSpacing: "0.08em" }}
+              className="mb-4 text-center"
+              style={{ color: "var(--muted-foreground)", fontFamily: "'Inter', sans-serif", fontSize: "clamp(1rem, 3vw, 1.75rem)", letterSpacing: "0.08em", lineHeight: 1.2 }}
             >
               உங்கள் டோக்கன் இலக்கம் / Your Token Number
             </p>
@@ -294,30 +305,30 @@ export function TokenGenerated({ token, serviceName, serviceEmoji, onHome }: Pro
             </div>
 
             {/* Date/time stamp */}
-            <div className="flex gap-4 mt-5">
+            <div className="flex flex-wrap justify-center gap-6 mt-8">
               <div className="text-center">
-                <p className="text-xs text-muted-foreground" style={{ color: "var(--muted-foreground)", fontFamily: "'Inter', sans-serif" }}>
+                <p style={{ color: "var(--muted-foreground)", fontFamily: "'Inter', sans-serif", fontSize: "clamp(0.85rem, 2.4vw, 1.5rem)" }}>
                   Date
                 </p>
-                <p className="text-sm font-semibold" style={{ color: "var(--foreground)", fontFamily: "'Inter', sans-serif" }}>
+                <p className="font-semibold" style={{ color: "var(--foreground)", fontFamily: "'Inter', sans-serif", fontSize: "clamp(1rem, 2.8vw, 1.75rem)" }}>
                   {printedDate}
                 </p>
               </div>
               <div className="w-px" style={{ background: "var(--border)" }} />
               <div className="text-center">
-                <p className="text-xs" style={{ color: "var(--muted-foreground)", fontFamily: "'Inter', sans-serif" }}>
+                <p style={{ color: "var(--muted-foreground)", fontFamily: "'Inter', sans-serif", fontSize: "clamp(0.85rem, 2.4vw, 1.5rem)" }}>
                   Time
                 </p>
-                <p className="text-sm font-semibold" style={{ color: "var(--foreground)", fontFamily: "'Inter', sans-serif" }}>
+                <p className="font-semibold" style={{ color: "var(--foreground)", fontFamily: "'Inter', sans-serif", fontSize: "clamp(1rem, 2.8vw, 1.75rem)" }}>
                   {printedTime}
                 </p>
               </div>
               <div className="w-px" style={{ background: "var(--border)" }} />
               <div className="text-center">
-                <p className="text-xs" style={{ color: "var(--muted-foreground)", fontFamily: "'Inter', sans-serif" }}>
+                <p style={{ color: "var(--muted-foreground)", fontFamily: "'Inter', sans-serif", fontSize: "clamp(0.85rem, 2.4vw, 1.5rem)" }}>
                   Counter
                 </p>
-                <p className="text-sm font-semibold" style={{ color: "var(--foreground)", fontFamily: "'Inter', sans-serif" }}>
+                <p className="font-semibold" style={{ color: "var(--foreground)", fontFamily: "'Inter', sans-serif", fontSize: "clamp(1rem, 2.8vw, 1.75rem)" }}>
                   A
                 </p>
               </div>
@@ -326,7 +337,7 @@ export function TokenGenerated({ token, serviceName, serviceEmoji, onHome }: Pro
 
           {/* Printer status */}
           <div
-            className="flex items-center gap-3 px-6 py-4 border-t"
+            className="flex flex-wrap items-center gap-4 px-8 py-6 border-t"
             style={{ borderColor: "var(--border)", background: "var(--gov-cream)" }}
           >
             <div
@@ -335,11 +346,14 @@ export function TokenGenerated({ token, serviceName, serviceEmoji, onHome }: Pro
             >
               <Printer size={18} />
             </div>
-            <div>
-              <p className="text-sm font-semibold" style={{ color: "var(--foreground)", fontFamily: "'Inter', sans-serif" }}>
+            <div className="min-w-0 flex-1">
+              <p
+                className="font-semibold"
+                style={{ color: "var(--foreground)", fontFamily: "'Inter', sans-serif", fontSize: "clamp(1rem, 2.8vw, 1.75rem)", lineHeight: 1.2 }}
+              >
                 {printing ? "Printing token…" : "Token printed successfully"}
               </p>
-              <p className="text-xs" style={{ color: "var(--muted-foreground)", fontFamily: "'Inter', sans-serif" }}>
+              <p style={{ color: "var(--muted-foreground)", fontFamily: "'Inter', sans-serif", fontSize: "clamp(0.9rem, 2.4vw, 1.5rem)", lineHeight: 1.25 }}>
                 {printing
                   ? "Please wait while your token is being printed"
                   : "Please collect your token from the printer"}
@@ -365,51 +379,51 @@ export function TokenGenerated({ token, serviceName, serviceEmoji, onHome }: Pro
         {/* Success message */}
         <p
           className="text-center mb-2"
-          style={{ fontSize: "clamp(1.1rem, 3vw, 1.4rem)", fontWeight: 700, color: "#2E7D32" }}
+          style={{ fontSize: "clamp(2.2rem, 6vw, 2.8rem)", fontWeight: 700, color: "#2E7D32", lineHeight: 1.15 }}
         >
           உங்கள் டோக்கன் வெற்றிகரமாக உருவாக்கப்பட்டது
         </p>
         <p
           className="text-center mb-6"
-          style={{ color: "var(--muted-foreground)", fontFamily: "'Inter', sans-serif", fontSize: "0.9rem" }}
+          style={{ color: "var(--muted-foreground)", fontFamily: "'Inter', sans-serif", fontSize: "clamp(1.25rem, 3vw, 1.8rem)", lineHeight: 1.2 }}
         >
           Your token has been generated successfully
         </p>
 
         {/* Countdown + action buttons */}
-        <div className="flex flex-wrap justify-center gap-3">
+        <div className="flex flex-wrap justify-center gap-4">
           <button
             onClick={() => startReceiptPrint(receiptPrintData)}
-            className="flex items-center gap-3 px-6 py-4 rounded-2xl font-semibold shadow-lg transition-all duration-150 active:scale-95"
+            className="flex items-center gap-4 px-8 py-5 rounded-2xl font-semibold shadow-lg transition-all duration-150 active:scale-95"
             style={{
               background: "#fff",
               color: "#3D0010",
               border: "2px solid rgba(128,0,32,0.22)",
-              fontSize: "1rem",
+              fontSize: "clamp(1.25rem, 3vw, 2rem)",
               fontFamily: "'Inter', sans-serif",
             }}
             onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.opacity = "0.88")}
             onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.opacity = "1")}
           >
-            <Printer size={20} />
+            <Printer size={32} />
             Print Token
           </button>
           <button
             onClick={onHome}
-            className="flex items-center gap-3 px-6 py-4 rounded-2xl text-white font-semibold shadow-lg transition-all duration-150 active:scale-95"
+            className="flex items-center gap-4 px-8 py-5 rounded-2xl text-white font-semibold shadow-lg transition-all duration-150 active:scale-95"
             style={{
               background: "linear-gradient(135deg, #3D0010 0%, #800020 100%)",
-              fontSize: "1rem",
+              fontSize: "clamp(1.25rem, 3vw, 2rem)",
               fontFamily: "'Inter', sans-serif",
             }}
             onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.opacity = "0.88")}
             onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.opacity = "1")}
           >
-            <Home size={20} />
+            <Home size={32} />
             Return Home
             <span
-              className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold"
-              style={{ background: "rgba(212,175,55,0.3)", color: "var(--gov-gold)" }}
+              className="w-14 h-14 rounded-full flex items-center justify-center font-bold"
+              style={{ background: "rgba(212,175,55,0.3)", color: "var(--gov-gold)", fontSize: "1.75rem" }}
             >
               {countdown}
             </span>
@@ -448,21 +462,21 @@ export function TokenGenerated({ token, serviceName, serviceEmoji, onHome }: Pro
           background: #fff;
           color: #000;
           font-family: Arial, Helvetica, sans-serif;
-          font-size: 10px;
+          font-size: ${RECEIPT_BASE_FONT_PX}px;
           line-height: 1.35;
           overflow: hidden;
           page-break-inside: avoid;
           break-inside: avoid;
         }
         .ticket-center { text-align: center; }
-        .ticket-title { font-size: 11px; font-weight: 700; overflow-wrap: break-word; }
-        .ticket-subtitle { margin-top: 2px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
-        .ticket-rule { margin: 6px 0; border-top: 1px dashed #000; }
-        .ticket-service { font-size: 10px; font-weight: 700; overflow-wrap: break-word; }
-        .ticket-token { margin: 8px 0; max-width: 100%; overflow: visible; font-family: "Arial Black", Arial, Helvetica, sans-serif; font-size: ${receiptTokenFontSize}mm; line-height: 1; font-weight: 900; letter-spacing: 0.5mm; white-space: nowrap; }
+        .ticket-title { font-size: ${RECEIPT_TITLE_FONT_PX}px; font-weight: 700; overflow-wrap: break-word; }
+        .ticket-subtitle { margin-top: ${2 * TOKEN_SIZE_MULTIPLIER}px; font-size: ${RECEIPT_SUBTITLE_FONT_PX}px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .ticket-rule { margin: ${6 * TOKEN_SIZE_MULTIPLIER}px 0; border-top: 1px dashed #000; }
+        .ticket-service { font-size: ${RECEIPT_SERVICE_FONT_PX}px; font-weight: 700; overflow-wrap: break-word; }
+        .ticket-token { margin: ${8 * TOKEN_SIZE_MULTIPLIER}px 0; max-width: 100%; overflow: visible; font-family: "Arial Black", Arial, Helvetica, sans-serif; font-size: ${receiptTokenFontSize}mm; line-height: 1; font-weight: 900; letter-spacing: 0.5mm; white-space: nowrap; }
         .ticket-token-text { display: inline-block; transform: scaleX(${RECEIPT_TOKEN_WIDTH_SCALE}); transform-origin: center; }
-        .ticket-row { display: flex; justify-content: space-between; gap: 8px; margin: 3px 0; }
-        .ticket-note { font-size: 9px; }
+        .ticket-row { display: flex; justify-content: space-between; gap: ${8 * TOKEN_SIZE_MULTIPLIER}px; margin: ${3 * TOKEN_SIZE_MULTIPLIER}px 0; }
+        .ticket-note { font-size: ${RECEIPT_NOTE_FONT_PX}px; }
         @media print {
           @page {
             size: ${RECEIPT_PAGE_WIDTH_MM}mm auto;
