@@ -3,6 +3,9 @@ import { Home, Printer, CheckCircle } from "lucide-react";
 
 const RECEIPT_ORGANIZATION_NAME = "Vavuniya South Tamil Pradeshiya Sabha";
 const RECEIPT_NOTE = "Please wait until your token number is called.";
+const RECEIPT_PAGE_WIDTH_MM = 80;
+const RECEIPT_SAFE_WIDTH_MM = 68;
+const RECEIPT_SIDE_PADDING_MM = 3;
 
 interface ReceiptPrintData {
   token: string;
@@ -21,18 +24,26 @@ function escapeHtml(value: string) {
   })[char] || char);
 }
 
+function getReceiptTokenFontSize(token: string) {
+  if (token.length <= 4) return 32;
+  if (token.length <= 6) return 28;
+  return 24;
+}
+
 function buildReceiptHtml({ token, serviceName, printedDate, printedTime }: ReceiptPrintData) {
+  const tokenFontSize = getReceiptTokenFontSize(token);
+
   return `<!doctype html>
 <html>
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=302, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>${escapeHtml(token)} Receipt</title>
   <style>
-    @page { size: 80mm auto; margin: 0; }
+    @page { size: ${RECEIPT_PAGE_WIDTH_MM}mm auto; margin: 0; }
     html, body {
-      width: 80mm;
-      min-width: 80mm;
+      width: ${RECEIPT_PAGE_WIDTH_MM}mm;
+      min-width: ${RECEIPT_PAGE_WIDTH_MM}mm;
       margin: 0;
       padding: 0;
       background: #fff;
@@ -40,26 +51,27 @@ function buildReceiptHtml({ token, serviceName, printedDate, printedTime }: Rece
       overflow: hidden;
     }
     .print-ticket {
-      width: 80mm;
-      padding: 4mm 4mm 5mm;
+      width: ${RECEIPT_SAFE_WIDTH_MM}mm;
+      margin: 0 auto;
+      padding: 3mm ${RECEIPT_SIDE_PADDING_MM}mm 4mm;
       box-sizing: border-box;
       background: #fff;
       color: #000;
       font-family: Arial, Helvetica, sans-serif;
-      font-size: 11px;
+      font-size: 10px;
       line-height: 1.35;
       overflow: hidden;
       page-break-inside: avoid;
       break-inside: avoid;
     }
     .ticket-center { text-align: center; }
-    .ticket-title { font-size: 13px; font-weight: 700; overflow-wrap: break-word; }
-    .ticket-subtitle { margin-top: 2px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
-    .ticket-rule { margin: 7px 0; border-top: 1px dashed #000; }
-    .ticket-service { font-size: 12px; font-weight: 700; overflow-wrap: break-word; }
-    .ticket-token { margin: 8px 0; font-size: 38px; font-weight: 900; letter-spacing: 2px; white-space: nowrap; text-align: center; }
+    .ticket-title { font-size: 11px; font-weight: 700; overflow-wrap: break-word; }
+    .ticket-subtitle { margin-top: 2px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .ticket-rule { margin: 6px 0; border-top: 1px dashed #000; }
+    .ticket-service { font-size: 10px; font-weight: 700; overflow-wrap: break-word; }
+    .ticket-token { margin: 6px 0; max-width: 100%; overflow: hidden; font-size: ${tokenFontSize}px; font-weight: 900; letter-spacing: 0.5px; white-space: nowrap; text-align: center; }
     .ticket-row { display: flex; justify-content: space-between; gap: 8px; margin: 3px 0; }
-    .ticket-note { font-size: 10px; }
+    .ticket-note { font-size: 9px; }
   </style>
 </head>
 <body>
@@ -85,7 +97,7 @@ function printReceiptOnly(data: ReceiptPrintData) {
   iframe.style.position = "fixed";
   iframe.style.right = "0";
   iframe.style.bottom = "0";
-  iframe.style.width = "80mm";
+  iframe.style.width = `${RECEIPT_PAGE_WIDTH_MM}mm`;
   iframe.style.height = "120mm";
   iframe.style.border = "0";
   iframe.style.opacity = "0";
@@ -114,6 +126,10 @@ function printReceiptOnly(data: ReceiptPrintData) {
   }, 60000);
 }
 
+function isAndroidDevice() {
+  return /Android/i.test(window.navigator.userAgent);
+}
+
 function openReceiptOnly(data: ReceiptPrintData) {
   const receiptWindow = window.open("", "_blank", "width=420,height=720");
   if (!receiptWindow) {
@@ -129,6 +145,15 @@ function openReceiptOnly(data: ReceiptPrintData) {
     receiptWindow.focus();
     receiptWindow.print();
   }, 250);
+}
+
+function startReceiptPrint(data: ReceiptPrintData) {
+  if (isAndroidDevice()) {
+    openReceiptOnly(data);
+    return;
+  }
+
+  printReceiptOnly(data);
 }
 
 function TokenIcon({ size = 40, color = "currentColor" }: { size?: number; color?: string }) {
@@ -167,10 +192,11 @@ export function TokenGenerated({ token, serviceName, serviceEmoji, onHome }: Pro
     printedDate,
     printedTime,
   }), [printedDate, printedTime, serviceEmoji, serviceName, token]);
+  const receiptTokenFontSize = getReceiptTokenFontSize(token);
 
   useEffect(() => {
     const browserPrintTimer = setTimeout(() => {
-      printReceiptOnly(receiptPrintData);
+      startReceiptPrint(receiptPrintData);
     }, 450);
     const printTimer = setTimeout(() => {
       setPrinting(false);
@@ -376,7 +402,7 @@ export function TokenGenerated({ token, serviceName, serviceEmoji, onHome }: Pro
         {/* Countdown + action buttons */}
         <div className="flex flex-wrap justify-center gap-3">
           <button
-            onClick={() => openReceiptOnly(receiptPrintData)}
+            onClick={() => startReceiptPrint(receiptPrintData)}
             className="flex items-center gap-3 px-6 py-4 rounded-2xl font-semibold shadow-lg transition-all duration-150 active:scale-95"
             style={{
               background: "#fff",
@@ -439,35 +465,35 @@ export function TokenGenerated({ token, serviceName, serviceEmoji, onHome }: Pro
           position: fixed;
           top: 0;
           left: -10000px;
-          width: 80mm;
-          padding: 4mm 4mm 5mm;
+          width: ${RECEIPT_SAFE_WIDTH_MM}mm;
+          padding: 3mm ${RECEIPT_SIDE_PADDING_MM}mm 4mm;
           box-sizing: border-box;
           background: #fff;
           color: #000;
           font-family: Arial, Helvetica, sans-serif;
-          font-size: 11px;
+          font-size: 10px;
           line-height: 1.35;
           overflow: hidden;
           page-break-inside: avoid;
           break-inside: avoid;
         }
         .ticket-center { text-align: center; }
-        .ticket-title { font-size: 13px; font-weight: 700; overflow-wrap: break-word; }
-        .ticket-subtitle { margin-top: 2px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
-        .ticket-rule { margin: 7px 0; border-top: 1px dashed #000; }
-        .ticket-service { font-size: 12px; font-weight: 700; overflow-wrap: break-word; }
-        .ticket-token { margin: 8px 0; font-size: 38px; font-weight: 900; letter-spacing: 2px; white-space: nowrap; }
+        .ticket-title { font-size: 11px; font-weight: 700; overflow-wrap: break-word; }
+        .ticket-subtitle { margin-top: 2px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .ticket-rule { margin: 6px 0; border-top: 1px dashed #000; }
+        .ticket-service { font-size: 10px; font-weight: 700; overflow-wrap: break-word; }
+        .ticket-token { margin: 6px 0; max-width: 100%; overflow: hidden; font-size: ${receiptTokenFontSize}px; font-weight: 900; letter-spacing: 0.5px; white-space: nowrap; }
         .ticket-row { display: flex; justify-content: space-between; gap: 8px; margin: 3px 0; }
-        .ticket-note { font-size: 10px; }
+        .ticket-note { font-size: 9px; }
         @media print {
           @page {
-            size: 80mm auto;
+            size: ${RECEIPT_PAGE_WIDTH_MM}mm auto;
             margin: 0;
           }
           html,
           body {
-            width: 80mm !important;
-            min-width: 80mm !important;
+            width: ${RECEIPT_PAGE_WIDTH_MM}mm !important;
+            min-width: ${RECEIPT_PAGE_WIDTH_MM}mm !important;
             margin: 0 !important;
             padding: 0 !important;
             overflow: hidden !important;
@@ -481,10 +507,10 @@ export function TokenGenerated({ token, serviceName, serviceEmoji, onHome }: Pro
           }
           .print-ticket {
             position: fixed;
-            left: 0;
+            left: ${(RECEIPT_PAGE_WIDTH_MM - RECEIPT_SAFE_WIDTH_MM) / 2}mm;
             top: 0;
-            width: 80mm;
-            max-width: 80mm;
+            width: ${RECEIPT_SAFE_WIDTH_MM}mm;
+            max-width: ${RECEIPT_SAFE_WIDTH_MM}mm;
             margin: 0;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
