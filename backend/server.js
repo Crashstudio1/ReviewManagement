@@ -8,6 +8,12 @@ import { pool } from "./db.js";
 
 const port = Number(process.env.API_PORT || 4000);
 const currentFile = fileURLToPath(import.meta.url);
+const TEMPORARY_TOKEN_MIN = 300;
+const TEMPORARY_TOKEN_MAX = 400;
+
+function getTemporaryRandomTokenNumber() {
+  return Math.floor(Math.random() * (TEMPORARY_TOKEN_MAX - TEMPORARY_TOKEN_MIN + 1)) + TEMPORARY_TOKEN_MIN;
+}
 
 function toService(row) {
   return {
@@ -332,7 +338,7 @@ app.post("/api/tokens", async (req, res, next) => {
       [serviceCode],
     );
 
-    const [counterRows] = await connection.query(
+    await connection.query(
       `SELECT counter
        FROM token_counters
        WHERE service_code = ?
@@ -340,15 +346,15 @@ app.post("/api/tokens", async (req, res, next) => {
       [serviceCode],
     );
 
-    const nextCounter = Number(counterRows[0]?.counter || 0) + 1;
-    const token = `${serviceCode}${String(nextCounter).padStart(3, "0")}`;
+    const tokenNumber = getTemporaryRandomTokenNumber();
+    const token = `${serviceCode}${String(tokenNumber).padStart(3, "0")}`;
     const issuedYear = new Date().getFullYear();
 
     await connection.query(
       `UPDATE token_counters
        SET counter = ?
        WHERE service_code = ?`,
-      [nextCounter, serviceCode],
+      [tokenNumber, serviceCode],
     );
 
     await connection.query(

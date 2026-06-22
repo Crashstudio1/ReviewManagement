@@ -292,7 +292,7 @@ test("PUT /api/services/:code reports duplicate service codes", async () => {
   });
 });
 
-test("POST /api/tokens issues the next token inside a transaction", async () => {
+test("POST /api/tokens issues a temporary random token inside a transaction", async () => {
   const queries = [];
   const connection = {
     committed: false,
@@ -340,24 +340,24 @@ test("POST /api/tokens issues the next token inside a transaction", async () => 
     });
 
     assert.equal(response.status, 201);
-    assert.deepEqual(await response.json(), {
-      token: "A008",
-      service: {
-        code: "A",
-        emoji: "B",
-        ta: "Tamil",
-        si: "Sinhala",
-        en: "English",
-        counterNumber: "3",
-      },
-      issuedYear: new Date().getFullYear(),
+    const body = await response.json();
+    assert.match(body.token, /^A(3\d\d|400)$/);
+    assert.deepEqual(body.service, {
+      code: "A",
+      emoji: "B",
+      ta: "Tamil",
+      si: "Sinhala",
+      en: "English",
+      counterNumber: "3",
     });
+    assert.equal(body.issuedYear, new Date().getFullYear());
   });
 
   assert.equal(connection.committed, true);
   assert.equal(connection.released, true);
-  assert.equal(queries.at(-2).params[0], 8);
-  assert.equal(queries.at(-1).params[0], "A008");
+  assert.ok(queries.at(-2).params[0] >= 300);
+  assert.ok(queries.at(-2).params[0] <= 400);
+  assert.equal(queries.at(-1).params[0], `A${String(queries.at(-2).params[0]).padStart(3, "0")}`);
 });
 
 test("GET /api/tokens/counters returns current counters for active services", async () => {
