@@ -1,5 +1,135 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Home, Printer, CheckCircle } from "lucide-react";
+
+const RECEIPT_ORGANIZATION_NAME = "Vavuniya South Tamil Pradeshiya Sabha";
+const RECEIPT_NOTE = "Please wait until your token number is called.";
+
+interface ReceiptPrintData {
+  token: string;
+  serviceName: string;
+  printedDate: string;
+  printedTime: string;
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "\"": "&quot;",
+    "'": "&#39;",
+  })[char] || char);
+}
+
+function buildReceiptHtml({ token, serviceName, printedDate, printedTime }: ReceiptPrintData) {
+  return `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=302, initial-scale=1" />
+  <title>${escapeHtml(token)} Receipt</title>
+  <style>
+    @page { size: 80mm auto; margin: 0; }
+    html, body {
+      width: 80mm;
+      min-width: 80mm;
+      margin: 0;
+      padding: 0;
+      background: #fff;
+      color: #000;
+      overflow: hidden;
+    }
+    .print-ticket {
+      width: 80mm;
+      padding: 4mm 4mm 5mm;
+      box-sizing: border-box;
+      background: #fff;
+      color: #000;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 11px;
+      line-height: 1.35;
+      overflow: hidden;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .ticket-center { text-align: center; }
+    .ticket-title { font-size: 13px; font-weight: 700; overflow-wrap: break-word; }
+    .ticket-subtitle { margin-top: 2px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+    .ticket-rule { margin: 7px 0; border-top: 1px dashed #000; }
+    .ticket-service { font-size: 12px; font-weight: 700; overflow-wrap: break-word; }
+    .ticket-token { margin: 8px 0; font-size: 38px; font-weight: 900; letter-spacing: 2px; white-space: nowrap; text-align: center; }
+    .ticket-row { display: flex; justify-content: space-between; gap: 8px; margin: 3px 0; }
+    .ticket-note { font-size: 10px; }
+  </style>
+</head>
+<body>
+  <div class="print-ticket">
+    <div class="ticket-center ticket-title">${escapeHtml(RECEIPT_ORGANIZATION_NAME)}</div>
+    <div class="ticket-center ticket-subtitle">Queue Token</div>
+    <div class="ticket-rule"></div>
+    <div class="ticket-center ticket-service">${escapeHtml(serviceName)}</div>
+    <div class="ticket-token">${escapeHtml(token)}</div>
+    <div class="ticket-row"><span>Date</span><strong>${escapeHtml(printedDate)}</strong></div>
+    <div class="ticket-row"><span>Time</span><strong>${escapeHtml(printedTime)}</strong></div>
+    <div class="ticket-rule"></div>
+    <div class="ticket-center ticket-note">${escapeHtml(RECEIPT_NOTE)}</div>
+  </div>
+</body>
+</html>`;
+}
+
+function printReceiptOnly(data: ReceiptPrintData) {
+  const iframe = document.createElement("iframe");
+  iframe.title = "Token receipt print frame";
+  iframe.setAttribute("aria-hidden", "true");
+  iframe.style.position = "fixed";
+  iframe.style.right = "0";
+  iframe.style.bottom = "0";
+  iframe.style.width = "80mm";
+  iframe.style.height = "120mm";
+  iframe.style.border = "0";
+  iframe.style.opacity = "0";
+  iframe.style.pointerEvents = "none";
+  document.body.appendChild(iframe);
+
+  const frameWindow = iframe.contentWindow;
+  const frameDocument = frameWindow?.document;
+  if (!frameWindow || !frameDocument) {
+    iframe.remove();
+    window.print();
+    return;
+  }
+
+  frameDocument.open();
+  frameDocument.write(buildReceiptHtml(data));
+  frameDocument.close();
+
+  window.setTimeout(() => {
+    frameWindow.focus();
+    frameWindow.print();
+  }, 250);
+
+  window.setTimeout(() => {
+    iframe.remove();
+  }, 60000);
+}
+
+function openReceiptOnly(data: ReceiptPrintData) {
+  const receiptWindow = window.open("", "_blank", "width=420,height=720");
+  if (!receiptWindow) {
+    printReceiptOnly(data);
+    return;
+  }
+
+  receiptWindow.document.open();
+  receiptWindow.document.write(buildReceiptHtml(data));
+  receiptWindow.document.close();
+
+  window.setTimeout(() => {
+    receiptWindow.focus();
+    receiptWindow.print();
+  }, 250);
+}
 
 function TokenIcon({ size = 40, color = "currentColor" }: { size?: number; color?: string }) {
   return (
@@ -24,17 +154,23 @@ interface Props {
 }
 
 export function TokenGenerated({ token, serviceName, serviceEmoji, onHome }: Props) {
-  const [countdown, setCountdown] = useState(8);
+  const [countdown, setCountdown] = useState(30);
   const [printing, setPrinting] = useState(true);
   const [printed, setPrinted] = useState(false);
   const [issuedAt] = useState(() => new Date());
 
   const printedDate = issuedAt.toLocaleDateString("en-GB");
   const printedTime = issuedAt.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  const receiptPrintData = useMemo(() => ({
+    token,
+    serviceName: `${serviceEmoji} ${serviceName}`,
+    printedDate,
+    printedTime,
+  }), [printedDate, printedTime, serviceEmoji, serviceName, token]);
 
   useEffect(() => {
     const browserPrintTimer = setTimeout(() => {
-      window.print();
+      printReceiptOnly(receiptPrintData);
     }, 450);
     const printTimer = setTimeout(() => {
       setPrinting(false);
@@ -44,7 +180,7 @@ export function TokenGenerated({ token, serviceName, serviceEmoji, onHome }: Pro
       clearTimeout(browserPrintTimer);
       clearTimeout(printTimer);
     };
-  }, []);
+  }, [receiptPrintData]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -237,31 +373,49 @@ export function TokenGenerated({ token, serviceName, serviceEmoji, onHome }: Pro
           Your token has been generated successfully
         </p>
 
-        {/* Countdown + Home button */}
-        <button
-          onClick={onHome}
-          className="flex items-center gap-3 px-8 py-4 rounded-2xl text-white font-semibold shadow-lg transition-all duration-150 active:scale-95"
-          style={{
-            background: "linear-gradient(135deg, #3D0010 0%, #800020 100%)",
-            fontSize: "1rem",
-            fontFamily: "'Inter', sans-serif",
-          }}
-          onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.opacity = "0.88")}
-          onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.opacity = "1")}
-        >
-          <Home size={20} />
-          Return to Home
-          <span
-            className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold"
-            style={{ background: "rgba(212,175,55,0.3)", color: "var(--gov-gold)" }}
+        {/* Countdown + action buttons */}
+        <div className="flex flex-wrap justify-center gap-3">
+          <button
+            onClick={() => openReceiptOnly(receiptPrintData)}
+            className="flex items-center gap-3 px-6 py-4 rounded-2xl font-semibold shadow-lg transition-all duration-150 active:scale-95"
+            style={{
+              background: "#fff",
+              color: "#3D0010",
+              border: "2px solid rgba(128,0,32,0.22)",
+              fontSize: "1rem",
+              fontFamily: "'Inter', sans-serif",
+            }}
+            onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.opacity = "0.88")}
+            onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.opacity = "1")}
           >
-            {countdown}
-          </span>
-        </button>
+            <Printer size={20} />
+            Print Token
+          </button>
+          <button
+            onClick={onHome}
+            className="flex items-center gap-3 px-6 py-4 rounded-2xl text-white font-semibold shadow-lg transition-all duration-150 active:scale-95"
+            style={{
+              background: "linear-gradient(135deg, #3D0010 0%, #800020 100%)",
+              fontSize: "1rem",
+              fontFamily: "'Inter', sans-serif",
+            }}
+            onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.opacity = "0.88")}
+            onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.opacity = "1")}
+          >
+            <Home size={20} />
+            Return Home
+            <span
+              className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold"
+              style={{ background: "rgba(212,175,55,0.3)", color: "var(--gov-gold)" }}
+            >
+              {countdown}
+            </span>
+          </button>
+        </div>
       </div>
 
       <div className="print-ticket" aria-hidden="true">
-        <div className="ticket-center ticket-title">Vavuniya South Tamil Pradeshiya Sabha</div>
+        <div className="ticket-center ticket-title">{RECEIPT_ORGANIZATION_NAME}</div>
         <div className="ticket-center ticket-subtitle">Queue Token</div>
         <div className="ticket-rule" />
         <div className="ticket-center ticket-service">{serviceEmoji} {serviceName}</div>
@@ -269,7 +423,7 @@ export function TokenGenerated({ token, serviceName, serviceEmoji, onHome }: Pro
         <div className="ticket-row"><span>Date</span><strong>{printedDate}</strong></div>
         <div className="ticket-row"><span>Time</span><strong>{printedTime}</strong></div>
         <div className="ticket-rule" />
-        <div className="ticket-center ticket-note">Please wait until your token number is called.</div>
+        <div className="ticket-center ticket-note">{RECEIPT_NOTE}</div>
       </div>
 
       <style>{`
