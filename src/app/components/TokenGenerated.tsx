@@ -6,6 +6,8 @@ const RECEIPT_NOTE = "Please wait until your token number is called.";
 const RECEIPT_PAGE_WIDTH_MM = 80;
 const RECEIPT_SAFE_WIDTH_MM = 80;
 const RECEIPT_SIDE_PADDING_MM = 3;
+const TOKEN_SIZE_MULTIPLIER = 2;
+const RECEIPT_TOKEN_WIDTH_SCALE = 1 / TOKEN_SIZE_MULTIPLIER;
 
 interface ReceiptPrintData {
   token: string;
@@ -25,9 +27,9 @@ function escapeHtml(value: string) {
 }
 
 function getReceiptTokenFontSize(token: string) {
-  if (token.length <= 4) return 20;
-  if (token.length <= 6) return 16;
-  return 13;
+  if (token.length <= 4) return 20 * TOKEN_SIZE_MULTIPLIER;
+  if (token.length <= 6) return 16 * TOKEN_SIZE_MULTIPLIER;
+  return 13 * TOKEN_SIZE_MULTIPLIER;
 }
 
 function buildReceiptHtml({ token, serviceName, printedDate, printedTime }: ReceiptPrintData) {
@@ -69,7 +71,8 @@ function buildReceiptHtml({ token, serviceName, printedDate, printedTime }: Rece
     .ticket-subtitle { margin-top: 2px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
     .ticket-rule { margin: 6px 0; border-top: 1px dashed #000; }
     .ticket-service { font-size: 10px; font-weight: 700; overflow-wrap: break-word; }
-    .ticket-token { margin: 8px 0; max-width: 100%; overflow: hidden; font-family: "Arial Black", Arial, Helvetica, sans-serif; font-size: ${tokenFontSize}mm; line-height: 1; font-weight: 900; letter-spacing: 0.5mm; white-space: nowrap; text-align: center; }
+    .ticket-token { margin: 8px 0; max-width: 100%; overflow: visible; font-family: "Arial Black", Arial, Helvetica, sans-serif; font-size: ${tokenFontSize}mm; line-height: 1; font-weight: 900; letter-spacing: 0.5mm; white-space: nowrap; text-align: center; }
+    .ticket-token-text { display: inline-block; transform: scaleX(${RECEIPT_TOKEN_WIDTH_SCALE}); transform-origin: center; }
     .ticket-row { display: flex; justify-content: space-between; gap: 8px; margin: 3px 0; }
     .ticket-note { font-size: 9px; }
   </style>
@@ -80,7 +83,7 @@ function buildReceiptHtml({ token, serviceName, printedDate, printedTime }: Rece
     <div class="ticket-center ticket-subtitle">Queue Token</div>
     <div class="ticket-rule"></div>
     <div class="ticket-center ticket-service">${escapeHtml(serviceName)}</div>
-    <div class="ticket-token">${escapeHtml(token)}</div>
+    <div class="ticket-token"><span class="ticket-token-text">${escapeHtml(token)}</span></div>
     <div class="ticket-row"><span>Date</span><strong>${escapeHtml(printedDate)}</strong></div>
     <div class="ticket-row"><span>Time</span><strong>${escapeHtml(printedTime)}</strong></div>
     <div class="ticket-rule"></div>
@@ -270,7 +273,7 @@ export function TokenGenerated({ token, serviceName, serviceEmoji, onHome }: Pro
               உங்கள் டோக்கன் இலக்கம் / Your Token Number
             </p>
             <div
-              className="relative flex items-center justify-center w-48 h-28 rounded-2xl"
+              className="relative flex items-center justify-center w-full max-w-96 h-56 rounded-2xl"
               style={{
                 background: "linear-gradient(135deg, #3D0010 0%, #800020 100%)",
                 boxShadow: "0 8px 32px rgba(128,0,32,0.3)",
@@ -278,7 +281,7 @@ export function TokenGenerated({ token, serviceName, serviceEmoji, onHome }: Pro
             >
               <p
                 style={{
-                  fontSize: "4rem",
+                  fontSize: "clamp(5.5rem, 24vw, 8rem)",
                   fontWeight: 900,
                   color: "var(--gov-gold)",
                   fontFamily: "'Inter', sans-serif",
@@ -419,7 +422,7 @@ export function TokenGenerated({ token, serviceName, serviceEmoji, onHome }: Pro
         <div className="ticket-center ticket-subtitle">Queue Token</div>
         <div className="ticket-rule" />
         <div className="ticket-center ticket-service">{serviceEmoji} {serviceName}</div>
-        <div className="ticket-center ticket-token">{token}</div>
+        <div className="ticket-center ticket-token"><span className="ticket-token-text">{token}</span></div>
         <div className="ticket-row"><span>Date</span><strong>{printedDate}</strong></div>
         <div className="ticket-row"><span>Time</span><strong>{printedTime}</strong></div>
         <div className="ticket-rule" />
@@ -456,7 +459,8 @@ export function TokenGenerated({ token, serviceName, serviceEmoji, onHome }: Pro
         .ticket-subtitle { margin-top: 2px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
         .ticket-rule { margin: 6px 0; border-top: 1px dashed #000; }
         .ticket-service { font-size: 10px; font-weight: 700; overflow-wrap: break-word; }
-        .ticket-token { margin: 8px 0; max-width: 100%; overflow: hidden; font-family: "Arial Black", Arial, Helvetica, sans-serif; font-size: ${receiptTokenFontSize}mm; line-height: 1; font-weight: 900; letter-spacing: 0.5mm; white-space: nowrap; }
+        .ticket-token { margin: 8px 0; max-width: 100%; overflow: visible; font-family: "Arial Black", Arial, Helvetica, sans-serif; font-size: ${receiptTokenFontSize}mm; line-height: 1; font-weight: 900; letter-spacing: 0.5mm; white-space: nowrap; }
+        .ticket-token-text { display: inline-block; transform: scaleX(${RECEIPT_TOKEN_WIDTH_SCALE}); transform-origin: center; }
         .ticket-row { display: flex; justify-content: space-between; gap: 8px; margin: 3px 0; }
         .ticket-note { font-size: 9px; }
         @media print {
