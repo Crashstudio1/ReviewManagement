@@ -5,14 +5,16 @@ const RECEIPT_ORGANIZATION_NAME = "Vavuniya South Tamil Pradeshiya Sabha";
 const RECEIPT_NOTE = "Please wait until your token number is called.";
 const RECEIPT_PAGE_WIDTH_MM = 80;
 const RECEIPT_SAFE_WIDTH_MM = 80;
-const RECEIPT_SIDE_PADDING_MM = 3;
+const RECEIPT_SIDE_PADDING_MM = 1.5;
+const RECEIPT_TOP_PADDING_MM = 3;
+const RECEIPT_BOTTOM_PADDING_MM = 12;
 const TOKEN_SIZE_MULTIPLIER = 2;
-const RECEIPT_TOKEN_WIDTH_SCALE = 1 / TOKEN_SIZE_MULTIPLIER;
+const RECEIPT_TOKEN_WIDTH_SCALE = 0.72;
 const RECEIPT_BASE_FONT_PX = 10 * TOKEN_SIZE_MULTIPLIER;
 const RECEIPT_TITLE_FONT_PX = 11 * TOKEN_SIZE_MULTIPLIER;
 const RECEIPT_SUBTITLE_FONT_PX = 10 * TOKEN_SIZE_MULTIPLIER;
 const RECEIPT_SERVICE_FONT_PX = 10 * TOKEN_SIZE_MULTIPLIER;
-const RECEIPT_NOTE_FONT_PX = 9 * TOKEN_SIZE_MULTIPLIER;
+const RECEIPT_NOTE_FONT_PX = 8 * TOKEN_SIZE_MULTIPLIER;
 
 interface ReceiptPrintData {
   token: string;
@@ -60,7 +62,7 @@ function buildReceiptHtml({ token, serviceName, printedDate, printedTime }: Rece
     .print-ticket {
       width: ${RECEIPT_SAFE_WIDTH_MM}mm;
       margin: 0 auto;
-      padding: 3mm ${RECEIPT_SIDE_PADDING_MM}mm 4mm;
+      padding: ${RECEIPT_TOP_PADDING_MM}mm ${RECEIPT_SIDE_PADDING_MM}mm ${RECEIPT_BOTTOM_PADDING_MM}mm;
       box-sizing: border-box;
       background: #fff;
       color: #000;
@@ -79,7 +81,7 @@ function buildReceiptHtml({ token, serviceName, printedDate, printedTime }: Rece
     .ticket-token { margin: ${8 * TOKEN_SIZE_MULTIPLIER}px 0; max-width: 100%; overflow: visible; font-family: "Arial Black", Arial, Helvetica, sans-serif; font-size: ${tokenFontSize}mm; line-height: 1; font-weight: 900; letter-spacing: 0.5mm; white-space: nowrap; text-align: center; }
     .ticket-token-text { display: inline-block; transform: scaleX(${RECEIPT_TOKEN_WIDTH_SCALE}); transform-origin: center; }
     .ticket-row { display: flex; justify-content: space-between; gap: ${8 * TOKEN_SIZE_MULTIPLIER}px; margin: ${3 * TOKEN_SIZE_MULTIPLIER}px 0; }
-    .ticket-note { font-size: ${RECEIPT_NOTE_FONT_PX}px; }
+    .ticket-note { font-size: ${RECEIPT_NOTE_FONT_PX}px; line-height: 1.2; padding-bottom: 2mm; }
   </style>
 </head>
 <body>
@@ -106,7 +108,7 @@ function printReceiptOnly(data: ReceiptPrintData) {
   iframe.style.right = "0";
   iframe.style.bottom = "0";
   iframe.style.width = `${RECEIPT_PAGE_WIDTH_MM}mm`;
-  iframe.style.height = "120mm";
+  iframe.style.height = "180mm";
   iframe.style.border = "0";
   iframe.style.opacity = "0";
   iframe.style.pointerEvents = "none";
@@ -457,7 +459,7 @@ export function TokenGenerated({ token, serviceName, serviceEmoji, onHome }: Pro
           top: 0;
           left: -10000px;
           width: ${RECEIPT_SAFE_WIDTH_MM}mm;
-          padding: 3mm ${RECEIPT_SIDE_PADDING_MM}mm 4mm;
+          padding: ${RECEIPT_TOP_PADDING_MM}mm ${RECEIPT_SIDE_PADDING_MM}mm ${RECEIPT_BOTTOM_PADDING_MM}mm;
           box-sizing: border-box;
           background: #fff;
           color: #000;
@@ -476,7 +478,7 @@ export function TokenGenerated({ token, serviceName, serviceEmoji, onHome }: Pro
         .ticket-token { margin: ${8 * TOKEN_SIZE_MULTIPLIER}px 0; max-width: 100%; overflow: visible; font-family: "Arial Black", Arial, Helvetica, sans-serif; font-size: ${receiptTokenFontSize}mm; line-height: 1; font-weight: 900; letter-spacing: 0.5mm; white-space: nowrap; }
         .ticket-token-text { display: inline-block; transform: scaleX(${RECEIPT_TOKEN_WIDTH_SCALE}); transform-origin: center; }
         .ticket-row { display: flex; justify-content: space-between; gap: ${8 * TOKEN_SIZE_MULTIPLIER}px; margin: ${3 * TOKEN_SIZE_MULTIPLIER}px 0; }
-        .ticket-note { font-size: ${RECEIPT_NOTE_FONT_PX}px; }
+        .ticket-note { font-size: ${RECEIPT_NOTE_FONT_PX}px; line-height: 1.2; padding-bottom: 2mm; }
         @media print {
           @page {
             size: ${RECEIPT_PAGE_WIDTH_MM}mm auto;
