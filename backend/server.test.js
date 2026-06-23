@@ -360,10 +360,72 @@ test("POST /api/tokens starts a category at its temporary number inside a transa
   assert.equal(queries.at(-1).params[0], "A303");
 });
 
+test("POST /api/tokens continues from saved token history when counters are behind", async () => {
+  const queries = [];
+  const connection = {
+    committed: false,
+    released: false,
+    async beginTransaction() {},
+    async query(sql, params) {
+      queries.push({ sql, params });
+      if (sql.includes("FROM services")) {
+        return [[{
+          code: "A",
+          emoji: "B",
+          name_ta: "Tamil",
+          name_si: "Sinhala",
+          name_en: "English",
+          counter_number: "3",
+          active: 1,
+        }]];
+      }
+      if (sql.includes("FROM token_counters")) {
+        return [[{ counter: 303 }]];
+      }
+      if (sql.includes("FROM token_issues")) {
+        return [[{ counter: 309 }]];
+      }
+      return [{}];
+    },
+    async commit() {
+      this.committed = true;
+    },
+    async rollback() {
+      throw new Error("rollback should not be called");
+    },
+    release() {
+      this.released = true;
+    },
+  };
+  const app = createApp({
+    async getConnection() {
+      return connection;
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/tokens`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ serviceCode: "A" }),
+    });
+
+    assert.equal(response.status, 201);
+    const body = await response.json();
+    assert.equal(body.token, "A310");
+  });
+
+  assert.equal(connection.committed, true);
+  assert.equal(connection.released, true);
+  assert.equal(queries.at(-2).params[0], 310);
+  assert.equal(queries.at(-1).params[0], "A310");
+});
+
 test("GET /api/tokens/counters returns current counters for active services", async () => {
   const app = createApp({
     async query(sql) {
       assert.match(sql, /LEFT JOIN token_counters/);
+      assert.match(sql, /LEFT JOIN token_issues/);
       assert.match(sql, /s\.active = 1/);
       return [[
         { code: "A", counter: 8 },

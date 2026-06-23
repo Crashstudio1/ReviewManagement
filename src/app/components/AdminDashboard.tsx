@@ -1092,6 +1092,8 @@ export function AdminDashboard({
 
   async function handleAddService(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setServiceError("");
+    setServiceMessage("");
 
     const nextService: Service = {
       emoji: serviceForm.emoji.trim() || "\uD83D\uDCCB",
@@ -1116,20 +1118,26 @@ export function AdminDashboard({
       return;
     }
 
-    if (editingServiceCode) {
-      const savedService = await onUpdateService(editingServiceCode, nextService);
-      const updatedServices = services.map((service) => (
-        service.code.trim().toUpperCase() === editingServiceCode ? savedService : service
-      ));
-      resetServiceForm(updatedServices);
-      setServiceMessage(`${savedService.en} was updated in the kiosk service list.`);
-      return;
-    }
+    try {
+      if (editingServiceCode) {
+        const savedService = await onUpdateService(editingServiceCode, nextService);
+        const updatedServices = services.map((service) => (
+          service.code.trim().toUpperCase() === editingServiceCode ? savedService : service
+        ));
+        resetServiceForm(updatedServices);
+        setServiceMessage(`${savedService.en} was updated in the database.`);
+        return;
+      }
 
-    const savedService = await onAddService(nextService);
-    const updatedServices = [...services, savedService];
-    resetServiceForm(updatedServices);
-    setServiceMessage(`${savedService.en} was added to the kiosk service list.`);
+      const savedService = await onAddService(nextService);
+      const updatedServices = [...services, savedService];
+      resetServiceForm(updatedServices);
+      setServiceMessage(`${savedService.en} was added to the database.`);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "Please check the API and MySQL connection.";
+      setServiceError(`Service was not saved to the database. ${detail}`);
+      setServiceMessage("");
+    }
   }
 
   const selectedYearUsage = tokenUsageByYear[selectedTokenYear] || {};

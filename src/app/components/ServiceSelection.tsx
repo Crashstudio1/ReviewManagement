@@ -32,9 +32,10 @@ interface Props {
   onBack: () => void;
   tokenCounters: Record<string, number>;
   services: Service[];
+  tokenError?: string;
 }
 
-export function ServiceSelection({ onSelect, onBack, tokenCounters, services }: Props) {
+export function ServiceSelection({ onSelect, onBack, tokenCounters, services, tokenError = "" }: Props) {
   return (
     <div
       className="flex flex-col min-h-screen"
@@ -93,6 +94,14 @@ export function ServiceSelection({ onSelect, onBack, tokenCounters, services }: 
 
       {/* Grid */}
       <main className="flex-1 p-5 overflow-auto">
+        {tokenError && (
+          <div
+            className="mx-auto mb-4 max-w-5xl rounded-xl px-4 py-3 text-sm font-semibold"
+            style={{ background: "#FFEBEE", border: "1px solid #FFCDD2", color: "#C62828", fontFamily: "'Inter', sans-serif" }}
+          >
+            {tokenError}
+          </div>
+        )}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 max-w-5xl mx-auto">
           {services.map((svc) => {
             const nextToken = getNextTemporaryTokenNumber(svc.code, tokenCounters[svc.code] || 0);

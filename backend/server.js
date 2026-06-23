@@ -359,7 +359,17 @@ app.post("/api/tokens", async (req, res, next) => {
       [serviceCode],
     );
 
-    const currentCounter = Number(counterRows[0]?.counter || 0);
+    const [issuedCounterRows] = await connection.query(
+      `SELECT COALESCE(MAX(CAST(SUBSTRING(token_number, ?) AS UNSIGNED)), 0) AS counter
+       FROM token_issues
+       WHERE service_code = ?`,
+      [serviceCode.length + 1, serviceCode],
+    );
+
+    const currentCounter = Math.max(
+      Number(counterRows[0]?.counter || 0),
+      Number(issuedCounterRows[0]?.counter || 0),
+    );
     const nextCounter = Math.max(currentCounter + 1, getTemporaryTokenStart(serviceCode));
     const token = `${serviceCode}${String(nextCounter).padStart(3, "0")}`;
     const issuedYear = new Date().getFullYear();
@@ -412,10 +422,17 @@ app.get("/api/tokens/usage/by-year", async (_req, res, next) => {
 app.get("/api/tokens/counters", async (_req, res, next) => {
   try {
     const [rows] = await apiPool.query(
-      `SELECT s.code, COALESCE(c.counter, 0) AS counter
+      `SELECT
+         s.code,
+         GREATEST(
+           COALESCE(c.counter, 0),
+           COALESCE(MAX(CAST(SUBSTRING(t.token_number, CHAR_LENGTH(s.code) + 1) AS UNSIGNED)), 0)
+         ) AS counter
        FROM services s
        LEFT JOIN token_counters c ON c.service_code = s.code
+       LEFT JOIN token_issues t ON t.service_code = s.code
        WHERE s.active = 1
+       GROUP BY s.code, c.counter
        ORDER BY s.code`,
     );
 

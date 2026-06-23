@@ -8,7 +8,6 @@ import { AdminLogin } from "./components/AdminLogin";
 import { AdminDashboard } from "./components/AdminDashboard";
 import { AnalyticsPage } from "./components/AnalyticsPage";
 import { api, type AuthUser, type TokenUsageByYear } from "./api";
-import { getNextTemporaryTokenNumber } from "./tokenNumbers";
 
 /* MARKER-MAKE-KIT-INVOKED */
 
@@ -30,19 +29,8 @@ interface GeneratedToken {
   counterNumber: string;
 }
 
-const SERVICES_STORAGE_KEY = "gov-citizen-review-services";
+const LEGACY_SERVICES_STORAGE_KEY = "gov-citizen-review-services";
 const TOKEN_USAGE_STORAGE_KEY = "gov-citizen-review-token-usage";
-
-function loadServices() {
-  try {
-    const saved = window.localStorage.getItem(SERVICES_STORAGE_KEY);
-    if (!saved) return DEFAULT_SERVICES;
-    const parsed = JSON.parse(saved);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_SERVICES;
-  } catch {
-    return DEFAULT_SERVICES;
-  }
-}
 
 function loadTokenUsage(): TokenUsageByYear {
   try {
@@ -57,7 +45,7 @@ function loadTokenUsage(): TokenUsageByYear {
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("home");
-  const [services, setServices] = useState<Service[]>(loadServices);
+  const [services, setServices] = useState<Service[]>(DEFAULT_SERVICES);
   const [tokenCounters, setTokenCounters] = useState<Record<string, number>>({});
   const [tokenUsageByYear, setTokenUsageByYear] = useState<TokenUsageByYear>(loadTokenUsage);
   const [generatedToken, setGeneratedToken] = useState<GeneratedToken | null>(null);
@@ -65,12 +53,12 @@ export default function App() {
   const [adminUser, setAdminUser] = useState<AuthUser | null>(() => api.getStoredAdmin());
   // Track logo tap count for hidden admin entry
   const [logoTaps, setLogoTaps] = useState(0);
+  const [tokenIssueError, setTokenIssueError] = useState("");
 
-  const goHome = useCallback(() => setScreen("home"), []);
-
-  useEffect(() => {
-    window.localStorage.setItem(SERVICES_STORAGE_KEY, JSON.stringify(services));
-  }, [services]);
+  const goHome = useCallback(() => {
+    setTokenIssueError("");
+    setScreen("home");
+  }, []);
 
   useEffect(() => {
     window.localStorage.setItem(TOKEN_USAGE_STORAGE_KEY, JSON.stringify(tokenUsageByYear));
@@ -78,15 +66,16 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
+    window.localStorage.removeItem(LEGACY_SERVICES_STORAGE_KEY);
 
     api.getServices()
       .then((apiServices) => {
-        if (!cancelled && apiServices.length > 0) {
+        if (!cancelled) {
           setServices(apiServices);
         }
       })
       .catch(() => {
-        // MySQL API is optional for demo mode; localStorage remains the fallback.
+        // Keep default services visible, but do not load browser-only admin changes.
       });
 
     api.getTokenUsageByYear()
@@ -103,10 +92,14 @@ export default function App() {
       .then((counters) => {
         if (!cancelled) {
           setTokenCounters(counters);
+          setTokenIssueError("");
         }
       })
-      .catch(() => {
-        // Keep local counters when the API is not available.
+      .catch((error) => {
+        if (!cancelled) {
+          const detail = error instanceof Error ? error.message : "Please check the API and MySQL connection.";
+          setTokenIssueError(`Token numbers are not connected to the database. ${detail}`);
+        }
       });
 
     if (api.getAuthToken()) {
@@ -139,6 +132,8 @@ export default function App() {
   }
 
   async function handleSelectService(svc: Service) {
+    setTokenIssueError("");
+
     try {
       const issued = await api.issueToken(svc);
       const numericTokenPart = Number(issued.token.replace(svc.code, ""));
@@ -160,23 +155,13 @@ export default function App() {
       api.getTokenCounters()
         .then(setTokenCounters)
         .catch(() => {});
-      return;
-    } catch {
-      // Fall back to local token issuing when the MySQL API is unavailable.
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "Please check the API and MySQL connection.";
+      setTokenIssueError(`Token was not generated from the database. ${detail}`);
+      api.getTokenCounters()
+        .then(setTokenCounters)
+        .catch(() => {});
     }
-
-    const next = getNextTemporaryTokenNumber(svc.code, tokenCounters[svc.code] || 0);
-    const token = `${svc.code}${String(next).padStart(3, "0")}`;
-    setTokenCounters((prev) => ({ ...prev, [svc.code]: next }));
-    recordTokenUsage(String(new Date().getFullYear()), svc.code);
-    setGeneratedToken({
-      token,
-      serviceCode: svc.code,
-      serviceName: svc.en,
-      serviceEmoji: svc.emoji,
-      counterNumber: svc.counterNumber || "",
-    });
-    setScreen("token-generated");
   }
 
   function handleReviewSubmit(rating: number, comment = "", mobile = "", serviceCode = "", serviceName = "") {
@@ -188,25 +173,14 @@ export default function App() {
   }
 
   async function handleAddService(service: Service) {
-    try {
-      const saved = await api.addService(service);
-      setServices((prev) => [...prev, saved]);
-      return saved;
-    } catch {
-      setServices((prev) => [...prev, service]);
-      return service;
-    }
+    const saved = await api.addService(service);
+    setServices((prev) => [...prev, saved]);
+    return saved;
   }
 
   async function handleUpdateService(currentCode: string, service: Service) {
     const oldCode = currentCode.trim().toUpperCase();
-    let saved = service;
-
-    try {
-      saved = await api.updateService(currentCode, service);
-    } catch {
-      // Keep service editing available in offline/demo mode.
-    }
+    const saved = await api.updateService(currentCode, service);
 
     const newCode = saved.code.trim().toUpperCase();
     setServices((prev) => prev.map((item) => (
@@ -243,11 +217,7 @@ export default function App() {
 
   async function handleDeleteService(code: string) {
     const normalizedCode = code.trim().toUpperCase();
-    try {
-      await api.deleteService(normalizedCode);
-    } catch {
-      // Keep local service deletion available in offline/demo mode.
-    }
+    await api.deleteService(normalizedCode);
 
     setServices((prev) => prev.filter((item) => item.code.trim().toUpperCase() !== normalizedCode));
     setTokenCounters((prev) => {
@@ -330,6 +300,7 @@ export default function App() {
           onBack={goHome}
           tokenCounters={tokenCounters}
           services={services}
+          tokenError={tokenIssueError}
         />
       )}
 
